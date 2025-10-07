@@ -370,11 +370,8 @@ if ($action == 'list') {
                                                 ($account['status'] == 'pendente' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800') 
                                             ?>">
                                         <option value="pendente" <?= $account['status'] == 'pendente' ? 'selected' : '' ?>>Pendente</option>
-                                        <?php if ($account['type'] == 'despesa'): ?>
                                         <option value="paga" <?= $account['status'] == 'paga' ? 'selected' : '' ?>>Paga</option>
-                                        <?php else: ?>
                                         <option value="recebida" <?= $account['status'] == 'recebida' ? 'selected' : '' ?>>Recebida</option>
-                                        <?php endif; ?>
                                     </select>
                                 </form>
                             </td>
