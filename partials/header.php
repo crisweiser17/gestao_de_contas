@@ -1,0 +1,73 @@
+<?php
+function render_header($active) {
+    $items = [
+        'index' => ['label' => 'Dashboard', 'href' => 'index.php'],
+        'accounts' => ['label' => 'Contas', 'href' => 'accounts.php'],
+        'reports' => ['label' => 'Relatórios', 'href' => 'reports.php'],
+        'logout' => ['label' => 'Sair', 'href' => 'logout.php', 'danger' => true],
+    ];
+    ?>
+    <header class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <h1 class="text-xl font-bold text-gray-900">
+                        <i class="fas fa-chart-line text-primary mr-2"></i>
+                        <?= APP_NAME ?>
+                    </h1>
+                </div>
+                <nav class="flex space-x-4">
+                    <?php foreach ($items as $key => $item): ?>
+                        <?php 
+                            // Classes padrão
+                            $isActive = ($key === $active);
+                            $classes = 'text-gray-600 hover:text-primary';
+                            if ($isActive) $classes = 'text-primary font-medium';
+                            if (!empty($item['danger'])) $classes = 'text-red-600 hover:text-red-800';
+                        ?>
+                        <?php if ($key === 'accounts'): ?>
+                            <?php $parentActive = in_array($active, ['accounts','recurring','categories']); ?>
+                            <div class="relative group">
+                                <button type="button" class="<?= $parentActive ? 'text-primary font-medium' : $classes ?> inline-flex items-center cursor-default">
+                                    <?= $item['label'] ?>
+                                    <i class="fas fa-caret-down ml-1 text-xs"></i>
+                                </button>
+                                <div class="absolute left-0 top-full w-44 bg-white border border-gray-200 rounded shadow-lg p-2 hidden group-hover:block hover:block focus-within:block z-20">
+                                    <a href="accounts.php" class="block px-3 py-2 rounded <?= $active === 'accounts' ? 'text-primary font-medium bg-gray-50' : 'text-gray-700 hover:bg-gray-100' ?>">
+                                        Contas
+                                    </a>
+                                    <a href="categories.php" class="block px-3 py-2 rounded <?= $active === 'categories' ? 'text-primary font-medium bg-gray-50' : 'text-gray-700 hover:bg-gray-100' ?>">
+                                        Categorias
+                                    </a>
+                                    <a href="recurring.php" class="block px-3 py-2 rounded <?= $active === 'recurring' ? 'text-primary font-medium bg-gray-50' : 'text-gray-700 hover:bg-gray-100' ?>">
+                                        Recorrências
+                                    </a>
+                                </div>
+                            </div>
+                        <?php elseif ($key === 'reports'): ?>
+                            <?php $parentActive = in_array($active, ['reports','cash-flow']); ?>
+                            <div class="relative group">
+                                <button type="button" class="<?= $parentActive ? 'text-primary font-medium' : $classes ?> inline-flex items-center cursor-default">
+                                    <?= $item['label'] ?>
+                                    <i class="fas fa-caret-down ml-1 text-xs"></i>
+                                </button>
+                                <div class="absolute left-0 top-full w-52 bg-white border border-gray-200 rounded shadow-lg p-2 hidden group-hover:block hover:block focus-within:block z-20">
+                                    <a href="reports.php" class="block px-3 py-2 rounded <?= $active === 'reports' ? 'text-primary font-medium bg-gray-50' : 'text-gray-700 hover:bg-gray-100' ?>">
+                                        Relatórios
+                                    </a>
+                                    <a href="cash-flow.php" class="block px-3 py-2 rounded <?= $active === 'cash-flow' ? 'text-primary font-medium bg-gray-50' : 'text-gray-700 hover:bg-gray-100' ?>">
+                                        Fluxo de Caixa
+                                    </a>
+                                </div>
+                            </div>
+                        <?php else: ?>
+                            <a href="<?= $item['href'] ?>" class="<?= $classes ?>"><?= $item['label'] ?></a>
+                        <?php endif; ?>
+                    <?php endforeach; ?>
+                </nav>
+            </div>
+        </div>
+    </header>
+    <?php
+}
+?>

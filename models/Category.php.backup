@@ -1,0 +1,198 @@
+<?php
+require_once 'config/database.php';
+
+class Category {
+    private $conn;
+    private $table_name = "categories";
+
+    public function __construct() {
+        $database = new Database();
+        $this->conn = $database->getConnection();
+    }
+
+    // Buscar todas as categorias do usuário
+    public function getByUser($userId) {
+        $query = "SELECT * FROM " . $this->table_name . " 
+                  WHERE user_id = :user_id 
+                  ORDER BY type, name";
+        
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':user_id', $userId);
+        $stmt->execute();
+        
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    // Buscar categorias por tipo
+    public function getByType($userId, $type) {
+        $query = "SELECT * FROM " . $this->table_name . " 
+                  WHERE user_id = :user_id AND type = :type 
+                  ORDER BY name";
+        
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':user_id', $userId);
+        $stmt->bindParam(':type', $type);
+        $stmt->execute();
+        
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    // Buscar categoria por ID
+    public function getById($id, $userId) {
+        $query = "SELECT * FROM " . $this->table_name . " 
+                  WHERE id = :id AND user_id = :user_id";
+        
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':id', $id);
+        $stmt->bindParam(':user_id', $userId);
+        $stmt->execute();
+        
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+
+    // Criar nova categoria
+    public function create($data) {
+        $query = "INSERT INTO " . $this->table_name . " 
+                  (user_id, name, type, color) 
+                  VALUES (:user_id, :name, :type, :color)";
+        
+        $stmt = $this->conn->prepare($query);
+        
+        $stmt->bindParam(':user_id', $data['user_id']);
+        $stmt->bindParam(':name', $data['name']);
+        $stmt->bindParam(':type', $data['type']);
+        $stmt->bindParam(':color', $data['color']);
+        
+        if ($stmt->execute()) {
+            return $this->conn->lastInsertId();
+        }
+        return false;
+    }
+
+    // Atualizar categoria
+    public function update($id, $data, $userId) {
+        $query = "UPDATE " . $this->table_name . " 
+                  SET name = :name, type = :type, color = :color 
+                  WHERE id = :id AND user_id = :user_id";
+        
+        $stmt = $this->conn->prepare($query);
+        
+        $stmt->bindParam(':id', $id);
+        $stmt->bindParam(':user_id', $userId);
+        $stmt->bindParam(':name', $data['name']);
+        $stmt->bindParam(':type', $data['type']);
+        $stmt->bindParam(':color', $data['color']);
+        
+        return $stmt->execute();
+    }
+
+    // Deletar categoria (apenas se não tiver contas associadas)
+    public function delete($id, $userId) {
+        // Verificar se há contas associadas
+        $checkQuery = "SELECT COUNT(*) as count FROM accounts 
+                       WHERE category_id = :id AND user_id = :user_id";
+        
+        $checkStmt = $this->conn->prepare($checkQuery);
+        $checkStmt->bindParam(':id', $id);
+        $checkStmt->bindParam(':user_id', $userId);
+        $checkStmt->execute();
+        
+        $result = $checkStmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($result['count'] > 0) {
+            return ['success' => false, 'message' => 'Não é possível excluir categoria com contas associadas'];
+        }
+        
+        $query = "DELETE FROM " . $this->table_name . " 
+                  WHERE id = :id AND user_id = :user_id";
+        
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':id', $id);
+        $stmt->bindParam(':user_id', $userId);
+        
+        if ($stmt->execute()) {
+            return ['success' => true, 'message' => 'Categoria excluída com sucesso'];
+        }
+        
+        return ['success' => false, 'message' => 'Erro ao excluir categoria'];
+    }
+
+    // Verificar se nome da categoria já existe para o usuário
+    public function nameExists($name, $userId, $excludeId = null) {
+        $query = "SELECT COUNT(*) as count FROM " . $this->table_name . " 
+                  WHERE user_id = :user_id AND name = :name";
+        
+        if ($excludeId) {
+            $query .= " AND id != :exclude_id";
+        }
+        
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':user_id', $userId);
+        $stmt->bindParam(':name', $name);
+        
+        if ($excludeId) {
+            $stmt->bindParam(':exclude_id', $excludeId);
+        }
+        
+        $stmt->execute();
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        return $result['count'] > 0;
+    }
+
+    // Criar categorias padrão para novo usuário
+    public function createDefaultCategories($userId) {
+        $defaultCategories = [
+            // Receitas
+            ['name' => 'Salário', 'type' => 'receita', 'color' => '#10B981'],
+            ['name' => 'Freelance', 'type' => 'receita', 'color' => '#059669'],
+            ['name' => 'Investimentos', 'type' => 'receita', 'color' => '#047857'],
+            ['name' => 'Outros', 'type' => 'receita', 'color' => '#065F46'],
+            
+            // Despesas
+            ['name' => 'Aluguel', 'type' => 'despesa', 'color' => '#EF4444'],
+            ['name' => 'Alimentação', 'type' => 'despesa', 'color' => '#F97316'],
+            ['name' => 'Transporte', 'type' => 'despesa', 'color' => '#8B5CF6'],
+            ['name' => 'Saúde', 'type' => 'despesa', 'color' => '#EC4899'],
+            ['name' => 'Educação', 'type' => 'despesa', 'color' => '#3B82F6'],
+            ['name' => 'Lazer', 'type' => 'despesa', 'color' => '#06B6D4'],
+            ['name' => 'Telefone/Internet', 'type' => 'despesa', 'color' => '#84CC16'],
+            ['name' => 'Energia Elétrica', 'type' => 'despesa', 'color' => '#F59E0B'],
+            ['name' => 'Água', 'type' => 'despesa', 'color' => '#0EA5E9'],
+            ['name' => 'Outros', 'type' => 'despesa', 'color' => '#6B7280']
+        ];
+
+        foreach ($defaultCategories as $category) {
+            $category['user_id'] = $userId;
+            $this->create($category);
+        }
+    }
+
+    // Buscar estatísticas de uso das categorias
+    public function getUsageStats($userId, $period = null) {
+        $query = "SELECT c.id, c.name, c.type, c.color,
+                         COUNT(a.id) as usage_count,
+                         COALESCE(SUM(a.amount), 0) as total_amount
+                  FROM " . $this->table_name . " c
+                  LEFT JOIN accounts a ON c.id = a.category_id";
+        
+        if ($period) {
+            $query .= " AND DATE_FORMAT(a.due_date, '%Y-%m') = :period";
+        }
+        
+        $query .= " WHERE c.user_id = :user_id
+                    GROUP BY c.id, c.name, c.type, c.color
+                    ORDER BY c.type, usage_count DESC";
+        
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':user_id', $userId);
+        
+        if ($period) {
+            $stmt->bindParam(':period', $period);
+        }
+        
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
+?>
