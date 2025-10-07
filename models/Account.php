@@ -207,7 +207,7 @@ class Account {
     }
 
     // Buscar contas com filtros
-    public function getWithFilters($userId, $filters = []) {
+    public function getWithFilters($userId, $filters = [], $sortBy = 'due_date', $sortOrder = 'DESC') {
         $query = "SELECT a.*, c.name as category_name 
                   FROM " . $this->table_name . " a
                   LEFT JOIN categories c ON a.category_id = c.id
@@ -240,7 +240,26 @@ class Account {
             $params[':date_to'] = $filters['date_to'];
         }
         
-        $query .= " ORDER BY a.due_date DESC";
+        // Ordenação dinâmica
+        $query .= " ORDER BY ";
+        
+        switch ($sortBy) {
+            case 'status':
+                $query .= "a.status";
+                break;
+            case 'description':
+                $query .= "a.description";
+                break;
+            case 'amount':
+                $query .= "a.amount";
+                break;
+            case 'due_date':
+            default:
+                $query .= "a.due_date";
+                break;
+        }
+        
+        $query .= " " . $sortOrder;
         
         $stmt = $this->conn->prepare($query);
         

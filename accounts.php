@@ -160,8 +160,23 @@ $filters = [
     'date_to' => $_GET['filter_date_to'] ?? ''
 ];
 
+// Parâmetros de ordenação
+$sortBy = $_GET['sort_by'] ?? 'due_date';
+$sortOrder = $_GET['sort_order'] ?? 'DESC';
+
+// Validar parâmetros de ordenação
+$validSortColumns = ['due_date', 'status', 'description', 'amount'];
+if (!in_array($sortBy, $validSortColumns)) {
+    $sortBy = 'due_date';
+}
+
+$validSortOrders = ['ASC', 'DESC'];
+if (!in_array(strtoupper($sortOrder), $validSortOrders)) {
+    $sortOrder = 'DESC';
+}
+
 if ($action == 'list') {
-    $accounts = $accountModel->getWithFilters($userId, array_filter($filters));
+    $accounts = $accountModel->getWithFilters($userId, array_filter($filters), $sortBy, $sortOrder);
 } else if ($action == 'edit' && $accountId) {
     $account = $accountModel->getById($accountId, $userId);
     $recurringSetting = $recurringModel->getByAccountId($accountId);
@@ -277,11 +292,39 @@ if ($action == 'list') {
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                         <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descrição</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <a href="?action=list&<?= http_build_query(array_merge($_GET, ['sort_by' => 'description', 'sort_order' => ($sortBy == 'description' && $sortOrder == 'ASC') ? 'DESC' : 'ASC'])) ?>" class="flex items-center hover:text-gray-700">
+                                    Descrição
+                                    <?php if ($sortBy == 'description'): ?>
+                                        <i class="fas fa-sort-<?= $sortOrder == 'ASC' ? 'up' : 'down' ?> ml-1"></i>
+                                    <?php endif; ?>
+                                </a>
+                            </th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoria</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vencimento</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <a href="?action=list&<?= http_build_query(array_merge($_GET, ['sort_by' => 'amount', 'sort_order' => ($sortBy == 'amount' && $sortOrder == 'ASC') ? 'DESC' : 'ASC'])) ?>" class="flex items-center hover:text-gray-700">
+                                    Valor
+                                    <?php if ($sortBy == 'amount'): ?>
+                                        <i class="fas fa-sort-<?= $sortOrder == 'ASC' ? 'up' : 'down' ?> ml-1"></i>
+                                    <?php endif; ?>
+                                </a>
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <a href="?action=list&<?= http_build_query(array_merge($_GET, ['sort_by' => 'due_date', 'sort_order' => ($sortBy == 'due_date' && $sortOrder == 'ASC') ? 'DESC' : 'ASC'])) ?>" class="flex items-center hover:text-gray-700">
+                                    Vencimento
+                                    <?php if ($sortBy == 'due_date'): ?>
+                                        <i class="fas fa-sort-<?= $sortOrder == 'ASC' ? 'up' : 'down' ?> ml-1"></i>
+                                    <?php endif; ?>
+                                </a>
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <a href="?action=list&<?= http_build_query(array_merge($_GET, ['sort_by' => 'status', 'sort_order' => ($sortBy == 'status' && $sortOrder == 'ASC') ? 'DESC' : 'ASC'])) ?>" class="flex items-center hover:text-gray-700">
+                                    Status
+                                    <?php if ($sortBy == 'status'): ?>
+                                        <i class="fas fa-sort-<?= $sortOrder == 'ASC' ? 'up' : 'down' ?> ml-1"></i>
+                                    <?php endif; ?>
+                                </a>
+                            </th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
                         </tr>
                     </thead>
