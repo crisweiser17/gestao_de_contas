@@ -84,6 +84,23 @@ class Account {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    // Buscar contas vencendo do 8º dia até o fim do mês atual
+    public function getUpcomingAccountsRestOfMonth($userId) {
+        $query = "SELECT a.*, c.name as category_name 
+                  FROM " . $this->table_name . " a
+                  LEFT JOIN categories c ON a.category_id = c.id
+                  WHERE a.user_id = :user_id 
+                  AND a.due_date BETWEEN DATE_ADD(CURDATE(), INTERVAL 8 DAY) AND LAST_DAY(CURDATE())
+                  AND a.status = 'pendente'
+                  ORDER BY a.due_date ASC";
+        
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':user_id', $userId);
+        $stmt->execute();
+        
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     // Calcular saldo atual (receitas pagas - despesas pagas)
     public function getCurrentBalance($userId) {
         $query = "SELECT 
@@ -120,8 +137,8 @@ class Account {
     // Criar nova conta
     public function create($data) {
         $query = "INSERT INTO " . $this->table_name . " 
-                  (user_id, category_id, description, amount, due_date, type, status, url, is_recurring, notes) 
-                  VALUES (:user_id, :category_id, :description, :amount, :due_date, :type, :status, :url, :is_recurring, :notes)";
+                  (user_id, category_id, description, amount, due_date, type, status, url, is_recurring, notes, attachment) 
+                  VALUES (:user_id, :category_id, :description, :amount, :due_date, :type, :status, :url, :is_recurring, :notes, :attachment)";
         
         $stmt = $this->conn->prepare($query);
         
@@ -135,6 +152,9 @@ class Account {
         $stmt->bindParam(':url', $data['url']);
         $stmt->bindParam(':is_recurring', $data['is_recurring'], PDO::PARAM_BOOL);
         $stmt->bindParam(':notes', $data['notes']);
+        
+        $attachment = $data['attachment'] ?? null;
+        $stmt->bindParam(':attachment', $attachment);
         
         if ($stmt->execute()) {
             return $this->conn->lastInsertId();
@@ -161,7 +181,8 @@ class Account {
     public function update($id, $data, $userId) {
         $query = "UPDATE " . $this->table_name . " 
                   SET category_id = :category_id, description = :description, amount = :amount, 
-                      due_date = :due_date, type = :type, status = :status, url = :url, notes = :notes
+                      due_date = :due_date, type = :type, status = :status, url = :url, notes = :notes, 
+                      attachment = :attachment, is_recurring = :is_recurring
                   WHERE id = :id AND user_id = :user_id";
         
         $stmt = $this->conn->prepare($query);
@@ -176,6 +197,10 @@ class Account {
         $stmt->bindParam(':status', $data['status']);
         $stmt->bindParam(':url', $data['url']);
         $stmt->bindParam(':notes', $data['notes']);
+        $stmt->bindParam(':is_recurring', $data['is_recurring'], PDO::PARAM_BOOL);
+        
+        $attachment = $data['attachment'] ?? null;
+        $stmt->bindParam(':attachment', $attachment);
         
         return $stmt->execute();
     }

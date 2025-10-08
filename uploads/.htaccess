@@ -1,0 +1,18 @@
+# Proteger diretório de uploads
+# Permitir apenas tipos de arquivo específicos
+
+<Files ~ "\.(pdf|jpg|jpeg|png)$">
+    Order allow,deny
+    Allow from all
+</Files>
+
+<Files ~ "^\.">
+    Order allow,deny
+    Deny from all
+</Files>
+
+# Bloquear execução de scripts
+<FilesMatch "\.(php|phtml|php3|php4|php5|pl|py|jsp|asp|sh|cgi)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>

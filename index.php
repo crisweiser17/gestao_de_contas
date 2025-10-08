@@ -49,6 +49,9 @@ $overdueAccounts = $accountModel->getOverdueAccounts($userId);
 // Contas vencendo nos próximos 7 dias
 $upcomingWeek = $accountModel->getUpcomingAccounts($userId, 7);
 
+// Contas vencendo do 8º dia até o fim do mês
+$upcomingRestOfMonth = $accountModel->getUpcomingAccountsRestOfMonth($userId);
+
 // Contas vencendo nos próximos 30 dias
 $upcomingMonth = $accountModel->getUpcomingAccounts($userId, 30);
 
@@ -86,17 +89,23 @@ $recentTransactions = $accountModel->getRecentTransactions($userId, 10);
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <!-- Cards de Resumo -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <!-- Saldo Atual -->
+            <!-- Mês/Ano Atual -->
             <div class="bg-white rounded-lg shadow p-6">
                 <div class="flex items-center">
                     <div class="p-2 bg-blue-100 rounded-lg">
-                        <i class="fas fa-wallet text-blue-600 text-xl"></i>
+                        <i class="fas fa-calendar-alt text-blue-600 text-xl"></i>
                     </div>
                     <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-600">Saldo Atual</p>
-                        <p class="text-2xl font-bold <?= $totalBalance >= 0 ? 'text-green-600' : 'text-red-600' ?>">
-                            <?= formatCurrency($totalBalance) ?>
-                        </p>
+                        <?php
+                        $meses = [
+                            1 => 'Janeiro', 2 => 'Fevereiro', 3 => 'Março', 4 => 'Abril',
+                            5 => 'Maio', 6 => 'Junho', 7 => 'Julho', 8 => 'Agosto',
+                            9 => 'Setembro', 10 => 'Outubro', 11 => 'Novembro', 12 => 'Dezembro'
+                        ];
+                        $mesAtual = $meses[date('n')];
+                        ?>
+                        <p class="text-sm font-medium text-gray-600">Período Atual</p>
+                        <p class="text-2xl font-bold text-blue-600"><?= $mesAtual ?> <?= date('Y') ?></p>
                     </div>
                 </div>
             </div>
@@ -245,15 +254,22 @@ $recentTransactions = $accountModel->getRecentTransactions($userId, 10);
                 <?php if (count($upcomingWeek) > 0): ?>
                 <div class="bg-white rounded-lg shadow">
                     <div class="p-6 border-b border-gray-200">
-                        <h3 class="text-lg font-medium text-yellow-600">
-                            <i class="fas fa-clock mr-2"></i>
-                            Vencendo em 7 dias (<?= count($upcomingWeek) ?>)
-                        </h3>
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-medium text-yellow-600">
+                                <i class="fas fa-clock mr-2"></i>
+                                Vencendo em 7 dias (<span id="week-count"><?= count($upcomingWeek) ?></span>)
+                            </h3>
+                            <div class="flex space-x-2">
+                                <button onclick="filterWeekAccounts('all')" id="week-filter-all" class="px-3 py-1 text-xs rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300 active">Todas</button>
+                                <button onclick="filterWeekAccounts('receita')" id="week-filter-receita" class="px-3 py-1 text-xs rounded-md bg-gray-100 text-gray-600 hover:bg-green-100 hover:text-green-700">A Receber</button>
+                                <button onclick="filterWeekAccounts('despesa')" id="week-filter-despesa" class="px-3 py-1 text-xs rounded-md bg-gray-100 text-gray-600 hover:bg-red-100 hover:text-red-700">A Pagar</button>
+                            </div>
+                        </div>
                     </div>
                     <div class="p-6">
-                        <div class="space-y-3">
+                        <div class="space-y-3" id="week-accounts-container">
                             <?php foreach ($upcomingWeek as $account): ?>
-                            <div class="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
+                            <div class="flex items-center justify-between p-3 bg-yellow-50 rounded-lg week-account" data-type="<?= $account['type'] ?>">
                                 <div>
                                     <p class="font-medium text-gray-900"><?= htmlspecialchars($account['description']) ?></p>
                                     <p class="text-sm text-gray-600"><?= formatDate($account['due_date']) ?></p>
@@ -263,6 +279,52 @@ $recentTransactions = $accountModel->getRecentTransactions($userId, 10);
                                         <?= formatCurrency($account['amount']) ?>
                                     </p>
                                     <span class="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded"><?= ucfirst($account['status']) ?></span>
+                                    <form method="POST" action="index.php" class="mt-2 inline-block">
+                                        <input type="hidden" name="action" value="update_status">
+                                        <input type="hidden" name="id" value="<?= $account['id'] ?>">
+                                        <input type="hidden" name="status" value="<?= $account['type'] == 'despesa' ? 'paga' : 'recebida' ?>">
+                                        <button type="submit" class="text-xs px-3 py-1 rounded-md border <?= $account['type'] == 'despesa' ? 'border-red-300 text-red-700 hover:bg-red-50' : 'border-green-300 text-green-700 hover:bg-green-50' ?>">
+                                            <i class="fas <?= $account['type'] == 'despesa' ? 'fa-check' : 'fa-check' ?> mr-1"></i>
+                                            <?= $account['type'] == 'despesa' ? 'Marcar como Paga' : 'Marcar como Recebida' ?>
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
+
+                <!-- Resto do mês (8º dia até fim do mês) -->
+                <?php if (count($upcomingRestOfMonth) > 0): ?>
+                <div class="bg-white rounded-lg shadow">
+                    <div class="p-6 border-b border-gray-200">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-medium text-blue-600">
+                                <i class="fas fa-calendar-week mr-2"></i>
+                                Vencendo até o fim do mês (<span id="month-count"><?= count($upcomingRestOfMonth) ?></span>)
+                            </h3>
+                            <div class="flex space-x-2">
+                                <button onclick="filterMonthAccounts('all')" id="month-filter-all" class="px-3 py-1 text-xs rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300 active">Todas</button>
+                                <button onclick="filterMonthAccounts('receita')" id="month-filter-receita" class="px-3 py-1 text-xs rounded-md bg-gray-100 text-gray-600 hover:bg-green-100 hover:text-green-700">A Receber</button>
+                                <button onclick="filterMonthAccounts('despesa')" id="month-filter-despesa" class="px-3 py-1 text-xs rounded-md bg-gray-100 text-gray-600 hover:bg-red-100 hover:text-red-700">A Pagar</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-6">
+                        <div class="space-y-3" id="month-accounts-container">
+                            <?php foreach ($upcomingRestOfMonth as $account): ?>
+                            <div class="flex items-center justify-between p-3 bg-blue-50 rounded-lg month-account" data-type="<?= $account['type'] ?>">
+                                <div>
+                                    <p class="font-medium text-gray-900"><?= htmlspecialchars($account['description']) ?></p>
+                                    <p class="text-sm text-gray-600"><?= formatDate($account['due_date']) ?></p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="font-bold <?= $account['type'] == 'receita' ? 'text-green-600' : 'text-red-600' ?>">
+                                        <?= formatCurrency($account['amount']) ?>
+                                    </p>
+                                    <span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded"><?= ucfirst($account['status']) ?></span>
                                     <form method="POST" action="index.php" class="mt-2 inline-block">
                                         <input type="hidden" name="action" value="update_status">
                                         <input type="hidden" name="id" value="<?= $account['id'] ?>">
@@ -300,7 +362,24 @@ $recentTransactions = $accountModel->getRecentTransactions($userId, 10);
                                 </div>
                                 <div>
                                     <p class="font-medium text-gray-900"><?= htmlspecialchars($transaction['description']) ?></p>
-                                    <p class="text-sm text-gray-600"><?= htmlspecialchars($transaction['category_name']) ?> • <?= formatDate($transaction['due_date']) ?></p>
+                                    <div class="flex items-center space-x-2">
+                                        <p class="text-sm text-gray-600"><?= htmlspecialchars($transaction['category_name']) ?> • <?= formatDate($transaction['due_date']) ?></p>
+                                        <?php if (!empty($transaction['attachment'])): ?>
+                                            <?php 
+                                            $fileExtension = strtolower(pathinfo($transaction['attachment'], PATHINFO_EXTENSION));
+                                            ?>
+                                            <a href="<?= htmlspecialchars($transaction['attachment']) ?>" target="_blank" 
+                                               class="inline-flex items-center text-blue-600 hover:text-blue-800 text-xs" title="Ver comprovante">
+                                                <?php if ($fileExtension === 'pdf'): ?>
+                                                    <i class="fas fa-file-pdf text-red-500"></i>
+                                                <?php elseif (in_array($fileExtension, ['jpg', 'jpeg', 'png'])): ?>
+                                                    <i class="fas fa-file-image text-green-500"></i>
+                                                <?php else: ?>
+                                                    <i class="fas fa-file text-gray-500"></i>
+                                                <?php endif; ?>
+                                            </a>
+                                        <?php endif; ?>
+                                    </div>
                                 </div>
                             </div>
                             <div class="text-right">
@@ -332,6 +411,86 @@ $recentTransactions = $accountModel->getRecentTransactions($userId, 10);
     </main>
 
     <script>
+        // Função para filtrar contas da seção "Vencendo em 7 dias"
+        function filterWeekAccounts(type) {
+            const accounts = document.querySelectorAll('.week-account');
+            const buttons = document.querySelectorAll('[id^="week-filter-"]');
+            const counter = document.getElementById('week-count');
+            let visibleCount = 0;
+
+            // Atualizar botões
+            buttons.forEach(btn => {
+                btn.classList.remove('bg-gray-200', 'bg-green-100', 'bg-red-100', 'text-gray-700', 'text-green-700', 'text-red-700', 'active');
+                btn.classList.add('bg-gray-100', 'text-gray-600');
+            });
+
+            const activeButton = document.getElementById(`week-filter-${type}`);
+            if (type === 'all') {
+                activeButton.classList.remove('bg-gray-100', 'text-gray-600');
+                activeButton.classList.add('bg-gray-200', 'text-gray-700', 'active');
+            } else if (type === 'receita') {
+                activeButton.classList.remove('bg-gray-100', 'text-gray-600');
+                activeButton.classList.add('bg-green-100', 'text-green-700');
+            } else if (type === 'despesa') {
+                activeButton.classList.remove('bg-gray-100', 'text-gray-600');
+                activeButton.classList.add('bg-red-100', 'text-red-700');
+            }
+
+            // Filtrar contas
+            accounts.forEach(account => {
+                const accountType = account.getAttribute('data-type');
+                if (type === 'all' || accountType === type) {
+                    account.style.display = 'flex';
+                    visibleCount++;
+                } else {
+                    account.style.display = 'none';
+                }
+            });
+
+            // Atualizar contador
+            counter.textContent = visibleCount;
+        }
+
+        // Função para filtrar contas da seção "Vencendo até o fim do mês"
+        function filterMonthAccounts(type) {
+            const accounts = document.querySelectorAll('.month-account');
+            const buttons = document.querySelectorAll('[id^="month-filter-"]');
+            const counter = document.getElementById('month-count');
+            let visibleCount = 0;
+
+            // Atualizar botões
+            buttons.forEach(btn => {
+                btn.classList.remove('bg-gray-200', 'bg-green-100', 'bg-red-100', 'text-gray-700', 'text-green-700', 'text-red-700', 'active');
+                btn.classList.add('bg-gray-100', 'text-gray-600');
+            });
+
+            const activeButton = document.getElementById(`month-filter-${type}`);
+            if (type === 'all') {
+                activeButton.classList.remove('bg-gray-100', 'text-gray-600');
+                activeButton.classList.add('bg-gray-200', 'text-gray-700', 'active');
+            } else if (type === 'receita') {
+                activeButton.classList.remove('bg-gray-100', 'text-gray-600');
+                activeButton.classList.add('bg-green-100', 'text-green-700');
+            } else if (type === 'despesa') {
+                activeButton.classList.remove('bg-gray-100', 'text-gray-600');
+                activeButton.classList.add('bg-red-100', 'text-red-700');
+            }
+
+            // Filtrar contas
+            accounts.forEach(account => {
+                const accountType = account.getAttribute('data-type');
+                if (type === 'all' || accountType === type) {
+                    account.style.display = 'flex';
+                    visibleCount++;
+                } else {
+                    account.style.display = 'none';
+                }
+            });
+
+            // Atualizar contador
+            counter.textContent = visibleCount;
+        }
+
         // Atualizar dados a cada 5 minutos
         setInterval(() => {
             location.reload();

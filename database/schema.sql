@@ -38,6 +38,7 @@ CREATE TABLE accounts (
     is_recurring BOOLEAN DEFAULT FALSE,
     recurring_parent_id INT NULL,
     notes TEXT NULL,
+    attachment VARCHAR(255) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,

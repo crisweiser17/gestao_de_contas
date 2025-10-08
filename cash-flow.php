@@ -204,11 +204,7 @@ function formatMonthYear($date) {
 
             <!-- Resumo -->
             <div class="p-6">
-                <div class="grid grid-cols-1 md:grid-cols-5 gap-6">
-                    <div class="text-center">
-                        <div class="text-2xl font-bold text-blue-600"><?= formatCurrency($projection['current_balance']) ?></div>
-                        <div class="text-sm text-gray-600">Saldo Atual</div>
-                    </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div class="text-center">
                         <div class="text-2xl font-bold text-green-600"><?= formatCurrency($projection['summary']['total_income']) ?></div>
                         <div class="text-sm text-gray-600">Receitas Previstas</div>
@@ -222,12 +218,6 @@ function formatMonthYear($date) {
                             <?= formatCurrency($projection['summary']['final_balance']) ?>
                         </div>
                         <div class="text-sm text-gray-600">Saldo Final</div>
-                    </div>
-                    <div class="text-center">
-                        <div class="text-2xl font-bold <?= $projection['summary']['lowest_balance'] >= 0 ? 'text-green-600' : 'text-red-600' ?>">
-                            <?= formatCurrency($projection['summary']['lowest_balance']) ?>
-                        </div>
-                        <div class="text-sm text-gray-600">Menor Saldo</div>
                     </div>
                 </div>
             </div>
@@ -297,44 +287,83 @@ function formatMonthYear($date) {
                     <i class="fas fa-calendar-day mr-2"></i>
                     Detalhamento Diário
                 </h3>
+                <p class="text-sm text-gray-600 mt-1">Movimentações previstas por dia no período selecionado</p>
             </div>
             <div class="max-h-96 overflow-y-auto">
-                <?php foreach ($projection['daily_flow'] as $day): ?>
-                <?php if (!empty($day['accounts'])): ?>
-                <div class="border-b border-gray-100 p-4">
-                    <div class="flex justify-between items-center mb-2">
-                        <h4 class="font-medium text-gray-900"><?= formatDate($day['date']) ?></h4>
-                        <div class="flex space-x-4 text-sm">
-                            <?php if ($day['income'] > 0): ?>
-                            <span class="text-green-600">+<?= formatCurrency($day['income']) ?></span>
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50 sticky top-0">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descrição</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoria</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Valor</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Saldo Acumulado</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <?php 
+                        $previousBalance = $projection['current_balance'];
+                        foreach ($projection['daily_flow'] as $day): 
+                        ?>
+                            <?php if (!empty($day['accounts'])): ?>
+                                <!-- Cabeçalho do dia -->
+                                <tr class="bg-blue-50 border-t-2 border-blue-200">
+                                    <td colspan="6" class="px-6 py-3">
+                                        <div class="flex justify-between items-center">
+                                            <h4 class="font-semibold text-blue-900"><?= formatDate($day['date']) ?></h4>
+                                            <div class="flex space-x-4 text-sm">
+                                                <span class="text-gray-600">Saldo Inicial: <?= formatCurrency($previousBalance) ?></span>
+                                                <?php if ($day['income'] > 0): ?>
+                                                <span class="text-green-600">Receitas: +<?= formatCurrency($day['income']) ?></span>
+                                                <?php endif; ?>
+                                                <?php if ($day['expense'] > 0): ?>
+                                                <span class="text-red-600">Despesas: -<?= formatCurrency($day['expense']) ?></span>
+                                                <?php endif; ?>
+                                                <span class="font-medium <?= $day['running_balance'] >= 0 ? 'text-green-600' : 'text-red-600' ?>">
+                                                    Saldo Final: <?= formatCurrency($day['running_balance']) ?>
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                
+                                <!-- Movimentações do dia -->
+                                <?php foreach ($day['accounts'] as $account): ?>
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-400">
+                                        <!-- Data vazia para as linhas de movimentação -->
+                                    </td>
+                                    <td class="px-6 py-3 text-sm text-gray-900">
+                                        <div class="flex items-center">
+                                            <?php if (isset($account['is_projection']) && $account['is_projection']): ?>
+                                            <i class="fas fa-sync-alt text-blue-500 mr-2" title="Conta recorrente projetada"></i>
+                                            <?php endif; ?>
+                                            <?= htmlspecialchars($account['description']) ?>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-500">
+                                        <?= htmlspecialchars($account['category_name'] ?? 'Sem categoria') ?>
+                                    </td>
+                                    <td class="px-6 py-3 whitespace-nowrap text-sm">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium <?= $account['type'] == 'receita' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' ?>">
+                                            <?= $account['type'] == 'receita' ? 'Receita' : 'Despesa' ?>
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-3 whitespace-nowrap text-sm text-right font-medium <?= $account['type'] == 'receita' ? 'text-green-600' : 'text-red-600' ?>">
+                                        <?= $account['type'] == 'receita' ? '+' : '-' ?><?= formatCurrency($account['amount']) ?>
+                                    </td>
+                                    <td class="px-6 py-3 whitespace-nowrap text-sm text-right text-gray-400">
+                                        <!-- Saldo vazio para as linhas de movimentação -->
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                                
+                                <?php $previousBalance = $day['running_balance']; ?>
                             <?php endif; ?>
-                            <?php if ($day['expense'] > 0): ?>
-                            <span class="text-red-600">-<?= formatCurrency($day['expense']) ?></span>
-                            <?php endif; ?>
-                            <span class="font-medium <?= $day['running_balance'] >= 0 ? 'text-green-600' : 'text-red-600' ?>">
-                                Saldo: <?= formatCurrency($day['running_balance']) ?>
-                            </span>
-                        </div>
-                    </div>
-                    <div class="space-y-1">
-                        <?php foreach ($day['accounts'] as $account): ?>
-                        <div class="flex justify-between items-center text-sm">
-                            <div class="flex items-center">
-                                <?php if (isset($account['is_projection']) && $account['is_projection']): ?>
-                                <i class="fas fa-sync-alt text-blue-500 mr-2" title="Conta recorrente projetada"></i>
-                                <?php endif; ?>
-                                <span class="text-gray-700"><?= htmlspecialchars($account['description']) ?></span>
-                                <span class="text-gray-500 ml-2">(<?= htmlspecialchars($account['category_name'] ?? '') ?>)</span>
-                            </div>
-                            <span class="font-medium <?= $account['type'] == 'receita' ? 'text-green-600' : 'text-red-600' ?>">
-                                <?= $account['type'] == 'receita' ? '+' : '-' ?><?= formatCurrency($account['amount']) ?>
-                            </span>
-                        </div>
                         <?php endforeach; ?>
-                    </div>
-                </div>
-                <?php endif; ?>
-                <?php endforeach; ?>
+                    </tbody>
+                </table>
             </div>
         </div>
     </main>

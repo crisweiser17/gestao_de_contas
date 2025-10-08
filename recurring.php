@@ -211,6 +211,7 @@ $needsProcessing = array_filter($accountsNeedingGeneration, function($account) u
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                         <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Conta</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Frequência</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Próxima Geração</th>
@@ -222,6 +223,11 @@ $needsProcessing = array_filter($accountsNeedingGeneration, function($account) u
                     <tbody class="bg-white divide-y divide-gray-200">
                         <?php foreach ($recurringAccounts as $account): ?>
                         <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 text-center">
+                                <span class="text-lg font-bold <?= $account['type'] == 'receita' ? 'text-green-600' : 'text-red-600' ?>">
+                                    <?= $account['type'] == 'receita' ? '+' : '-' ?>
+                                </span>
+                            </td>
                             <td class="px-6 py-4">
                                 <div>
                                     <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($account['description']) ?></div>
@@ -237,17 +243,29 @@ $needsProcessing = array_filter($accountsNeedingGeneration, function($account) u
                                 <?php
                                 $frequency = '';
                                 switch ($account['frequency_type']) {
-                                    case 'daily':
-                                        $frequency = "A cada {$account['frequency_interval']} dia(s)";
+                                    case 'semanal':
+                                        $frequency = "Semanal";
                                         break;
-                                    case 'weekly':
-                                        $frequency = "A cada {$account['frequency_interval']} semana(s)";
+                                    case 'mensal':
+                                        $frequency = "Mensal";
                                         break;
-                                    case 'monthly':
-                                        $frequency = "A cada {$account['frequency_interval']} mês(es)";
+                                    case 'bimestral':
+                                        $frequency = "Bimestral";
                                         break;
-                                    case 'yearly':
-                                        $frequency = "A cada {$account['frequency_interval']} ano(s)";
+                                    case 'trimestral':
+                                        $frequency = "Trimestral";
+                                        break;
+                                    case 'semestral':
+                                        $frequency = "Semestral";
+                                        break;
+                                    case 'anual':
+                                        $frequency = "Anual";
+                                        break;
+                                    case 'personalizado':
+                                        $frequency = "Personalizado ({$account['frequency_interval']} dias)";
+                                        break;
+                                    default:
+                                        $frequency = 'Não definida';
                                         break;
                                 }
                                 echo $frequency;
@@ -276,10 +294,10 @@ $needsProcessing = array_filter($accountsNeedingGeneration, function($account) u
                             </td>
                             <td class="px-6 py-4 text-sm font-medium">
                                 <div class="flex space-x-2">
-                                    <a href="accounts.php?edit=<?= $account['id'] ?>" 
+                                    <button onclick="openEditModal(<?= $account['id'] ?>)" 
                                        class="text-blue-600 hover:text-blue-900">
                                         <i class="fas fa-edit"></i>
-                                    </a>
+                                    </button>
                                     
                                     <?php if ($account['is_active']): ?>
                                     <form method="POST" class="inline" onsubmit="return confirm('Desativar esta recorrência?')">
@@ -330,5 +348,47 @@ $needsProcessing = array_filter($accountsNeedingGeneration, function($account) u
         </div>
         <?php endif; ?>
     </main>
+
+    <!-- Modal de Edição -->
+    <div id="editModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3 text-center">
+                <h3 class="text-lg leading-6 font-medium text-gray-900">Editar Recorrência</h3>
+                <div class="mt-2 px-7 py-3">
+                    <p class="text-sm text-gray-500">
+                        Para editar esta recorrência, você será redirecionado para a página de contas.
+                    </p>
+                </div>
+                <div class="items-center px-4 py-3">
+                    <button id="ok-btn" class="px-4 py-2 bg-blue-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300">
+                        Continuar
+                    </button>
+                    <button onclick="closeEditModal()" class="mt-2 px-4 py-2 bg-gray-300 text-gray-700 text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300">
+                        Cancelar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function openEditModal(accountId) {
+            document.getElementById('editModal').classList.remove('hidden');
+            document.getElementById('ok-btn').onclick = function() {
+                window.location.href = 'accounts.php?edit=' + accountId;
+            };
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').classList.add('hidden');
+        }
+
+        // Fechar modal ao clicar fora
+        document.getElementById('editModal').addEventListener('click', function(e) {
+            if (e.target.id === 'editModal') {
+                closeEditModal();
+            }
+        });
+    </script>
 </body>
 </html>

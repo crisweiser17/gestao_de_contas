@@ -86,6 +86,27 @@ foreach ($accounts as $account) {
     }
 }
 
+// Separar receitas e despesas em arrays diferentes
+$receitas = [];
+$despesas = [];
+
+foreach ($byCategory as $category) {
+    if ($category['type'] == 'receita') {
+        $receitas[] = $category;
+    } else {
+        $despesas[] = $category;
+    }
+}
+
+// Ordenar cada array alfabeticamente por nome da categoria
+usort($receitas, function($a, $b) {
+    return strcmp($a['name'], $b['name']);
+});
+
+usort($despesas, function($a, $b) {
+    return strcmp($a['name'], $b['name']);
+});
+
 // Exportação CSV
 if ($action == 'export_csv') {
     header('Content-Type: text/csv; charset=utf-8');
@@ -434,45 +455,104 @@ if ($action == 'export_pdf') {
             </div>
         </div>
 
-        <!-- Tabela por Categoria -->
-        <div class="bg-white rounded-lg shadow">
-            <div class="p-6 border-b border-gray-200">
-                <h3 class="text-lg font-semibold text-gray-900">
-                    <i class="fas fa-table mr-2"></i>
-                    Resumo por Categoria
-                </h3>
+        <!-- Tabelas por Categoria - Lado a Lado -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Tabela de Receitas -->
+            <div class="bg-white rounded-lg shadow">
+                <div class="p-6 border-b border-gray-200">
+                    <h3 class="text-lg font-semibold text-green-600">
+                        <i class="fas fa-plus-circle mr-2"></i>
+                        Receitas por Categoria
+                    </h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-green-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoria</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Realizado</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pendente</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contas</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            <?php if (empty($receitas)): ?>
+                            <tr>
+                                <td colspan="5" class="px-4 py-8 text-center text-gray-500">
+                                    <i class="fas fa-inbox text-2xl mb-2"></i>
+                                    <p>Nenhuma receita encontrada</p>
+                                </td>
+                            </tr>
+                            <?php else: ?>
+                            <?php foreach ($receitas as $category): ?>
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-4 text-sm font-medium text-gray-900"><?= htmlspecialchars($category['name']) ?></td>
+                                <td class="px-4 py-4 text-sm font-medium text-green-600">
+                                    <?= formatCurrency($category['total']) ?>
+                                </td>
+                                <td class="px-4 py-4 text-sm font-medium text-green-600">
+                                    <?= formatCurrency($category['paid']) ?>
+                                </td>
+                                <td class="px-4 py-4 text-sm font-medium text-gray-600">
+                                    <?= formatCurrency($category['pending']) ?>
+                                </td>
+                                <td class="px-4 py-4 text-sm text-gray-900"><?= $category['count'] ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
             </div>
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoria</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Realizado</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pendente</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contas</th>
-                        </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
-                        <?php foreach ($byCategory as $category): ?>
-                        <tr class="hover:bg-gray-50">
-                            <td class="px-6 py-4 text-sm font-medium text-gray-900"><?= htmlspecialchars($category['name']) ?></td>
-                            <td class="px-6 py-4 text-sm text-gray-900"><?= ucfirst($category['type']) ?></td>
-                            <td class="px-6 py-4 text-sm font-medium <?= $category['type'] == 'receita' ? 'text-green-600' : 'text-red-600' ?>">
-                                <?= formatCurrency($category['total']) ?>
-                            </td>
-                            <td class="px-6 py-4 text-sm font-medium <?= $category['type'] == 'receita' ? 'text-green-600' : 'text-red-600' ?>">
-                                <?= formatCurrency($category['paid']) ?>
-                            </td>
-                            <td class="px-6 py-4 text-sm font-medium text-gray-600">
-                                <?= formatCurrency($category['pending']) ?>
-                            </td>
-                            <td class="px-6 py-4 text-sm text-gray-900"><?= $category['count'] ?></td>
-                        </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
+
+            <!-- Tabela de Despesas -->
+            <div class="bg-white rounded-lg shadow">
+                <div class="p-6 border-b border-gray-200">
+                    <h3 class="text-lg font-semibold text-red-600">
+                        <i class="fas fa-minus-circle mr-2"></i>
+                        Despesas por Categoria
+                    </h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-red-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoria</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Realizado</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pendente</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contas</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            <?php if (empty($despesas)): ?>
+                            <tr>
+                                <td colspan="5" class="px-4 py-8 text-center text-gray-500">
+                                    <i class="fas fa-inbox text-2xl mb-2"></i>
+                                    <p>Nenhuma despesa encontrada</p>
+                                </td>
+                            </tr>
+                            <?php else: ?>
+                            <?php foreach ($despesas as $category): ?>
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-4 text-sm font-medium text-gray-900"><?= htmlspecialchars($category['name']) ?></td>
+                                <td class="px-4 py-4 text-sm font-medium text-red-600">
+                                    <?= formatCurrency($category['total']) ?>
+                                </td>
+                                <td class="px-4 py-4 text-sm font-medium text-red-600">
+                                    <?= formatCurrency($category['paid']) ?>
+                                </td>
+                                <td class="px-4 py-4 text-sm font-medium text-gray-600">
+                                    <?= formatCurrency($category['pending']) ?>
+                                </td>
+                                <td class="px-4 py-4 text-sm text-gray-900"><?= $category['count'] ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </main>
