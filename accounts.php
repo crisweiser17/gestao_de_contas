@@ -39,6 +39,9 @@ $success = '';
 
 // Processar ações
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    // Override action and accountId from POST if available
+    $action = $_POST['action'] ?? $action;
+    $accountId = $_POST['id'] ?? $accountId;
     if ($action == 'add' || $action == 'edit') {
         $data = [
             'user_id' => $userId,
@@ -186,45 +189,51 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     } else if ($action == 'update_status' && $accountId) {
         $status = $_POST['status'] ?? '';
         
-        // Debug: Log all POST data
-        $debugInfo = "DEBUG - POST data: " . json_encode($_POST) . " | ";
+        // Debug: Log all data
+        $debugInfo = "DEBUG - Action: {$action} | ";
         $debugInfo .= "Account ID: {$accountId} | ";
         $debugInfo .= "User ID: {$userId} | ";
         $debugInfo .= "New Status: {$status} | ";
+        $debugInfo .= "POST data: " . json_encode($_POST) . " | ";
+        $debugInfo .= "GET data: " . json_encode($_GET) . " | ";
         
-        if (in_array($status, ['pendente', 'paga', 'recebida'])) {
+        if (empty($accountId)) {
+            $errors[] = "ERRO: Account ID está vazio!";
+        } elseif (empty($status)) {
+            $errors[] = "ERRO: Status está vazio!";
+        } elseif (!in_array($status, ['pendente', 'paga', 'recebida'])) {
+            $errors[] = "ERRO: Status inválido: '{$status}'. Valores aceitos: pendente, paga, recebida";
+        } else {
             // Get current status before update
             $currentAccount = $accountModel->getById($accountId, $userId);
-            $oldStatus = $currentAccount ? $currentAccount['status'] : 'unknown';
-            $debugInfo .= "Old Status: {$oldStatus} | ";
-            
-            $updateResult = $accountModel->updateStatus($accountId, $status, $userId);
-            $debugInfo .= "Update Result: " . ($updateResult ? 'SUCCESS' : 'FAILED') . " | ";
-            
-            if ($updateResult) {
-                // Verify the update immediately
-                $verifyAccount = $accountModel->getById($accountId, $userId);
-                $actualStatus = $verifyAccount ? $verifyAccount['status'] : 'unknown';
-                $debugInfo .= "Verified Status: {$actualStatus} | ";
-                
-                $success = "Status atualizado: {$oldStatus} → {$status} → {$actualStatus} (ID: {$accountId}, " . date('H:i:s') . ")";
-                
-                if ($actualStatus !== $status) {
-                    $errors[] = "PROBLEMA: Status não foi salvo corretamente! Esperado: {$status}, Atual: {$actualStatus}";
-                }
+            if (!$currentAccount) {
+                $errors[] = "ERRO: Conta não encontrada (ID: {$accountId}, User: {$userId})";
             } else {
-                $errors[] = 'Erro ao atualizar status no banco de dados';
+                $oldStatus = $currentAccount['status'];
+                $debugInfo .= "Old Status: {$oldStatus} | ";
+                
+                $updateResult = $accountModel->updateStatus($accountId, $status, $userId);
+                $debugInfo .= "Update Result: " . ($updateResult ? 'SUCCESS' : 'FAILED') . " | ";
+                
+                if ($updateResult) {
+                    // Verify the update immediately
+                    $verifyAccount = $accountModel->getById($accountId, $userId);
+                    $actualStatus = $verifyAccount ? $verifyAccount['status'] : 'unknown';
+                    $debugInfo .= "Verified Status: {$actualStatus} | ";
+                    
+                    if ($actualStatus === $status) {
+                        $success = "✅ Status atualizado com sucesso: {$oldStatus} → {$actualStatus}";
+                    } else {
+                        $errors[] = "❌ PROBLEMA: Status não foi salvo! Esperado: {$status}, Atual: {$actualStatus}";
+                    }
+                } else {
+                    $errors[] = '❌ Erro ao executar UPDATE no banco de dados';
+                }
             }
-        } else {
-            $errors[] = "Status inválido: {$status}";
         }
         
-        // Add debug info to success or error messages
-        if (!empty($success)) {
-            $success .= "<br><small style='color: #666;'>{$debugInfo}</small>";
-        } else {
-            $errors[] = $debugInfo;
-        }
+        // Log debug info to error log only
+        error_log("STATUS UPDATE DEBUG: {$debugInfo}");
         
         $action = 'list';
     } else if ($action == 'delete' && $accountId) {
@@ -239,17 +248,34 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
 // Buscar dados para exibição
 $categories = $categoryModel->getByUserId($userId);
-$filters = [
-    'category_id' => $_GET['filter_category'] ?? '',
-    'type' => $_GET['filter_type'] ?? '',
-    'status' => $_GET['filter_status'] ?? '',
-    'date_from' => $_GET['filter_date_from'] ?? '',
-    'date_to' => $_GET['filter_date_to'] ?? ''
-];
 
-// Parâmetros de ordenação
-$sortBy = $_GET['sort_by'] ?? 'due_date';
-$sortOrder = $_GET['sort_order'] ?? 'DESC';
+// Preservar filtros após POST (quando vêm dos campos hidden do formulário)
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    $filters = [
+        'category_id' => $_POST['filter_category_id'] ?? $_GET['filter_category'] ?? '',
+        'type' => $_POST['filter_type'] ?? $_GET['filter_type'] ?? '',
+        'status' => $_POST['filter_status'] ?? $_GET['filter_status'] ?? '',
+        'date_from' => $_POST['filter_date_from'] ?? $_GET['filter_date_from'] ?? '',
+        'date_to' => $_POST['filter_date_to'] ?? $_GET['filter_date_to'] ?? ''
+    ];
+} else {
+    $filters = [
+        'category_id' => $_GET['filter_category'] ?? '',
+        'type' => $_GET['filter_type'] ?? '',
+        'status' => $_GET['filter_status'] ?? '',
+        'date_from' => $_GET['filter_date_from'] ?? '',
+        'date_to' => $_GET['filter_date_to'] ?? ''
+    ];
+}
+
+// Parâmetros de ordenação (preservar após POST)
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    $sortBy = $_POST['sort_by'] ?? $_GET['sort_by'] ?? 'due_date';
+    $sortOrder = $_POST['sort_order'] ?? $_GET['sort_order'] ?? 'DESC';
+} else {
+    $sortBy = $_GET['sort_by'] ?? 'due_date';
+    $sortOrder = $_GET['sort_order'] ?? 'DESC';
+}
 
 // Validar parâmetros de ordenação
 $validSortColumns = ['due_date', 'status', 'description', 'amount'];
@@ -474,14 +500,19 @@ if ($action == 'list') {
                                     <?php if (!empty($sortOrder)): ?>
                                     <input type="hidden" name="sort_order" value="<?= htmlspecialchars($sortOrder) ?>">
                                     <?php endif; ?>
-                                    <select name="status" onchange="this.form.submit()" 
-                                            class="text-xs px-2 py-1 rounded border-0 <?= 
-                                                $account['status'] == 'paga' ? 'bg-green-100 text-green-800' : 
-                                                ($account['status'] == 'pendente' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800') 
-                                            ?>">
-                                        <option value="pendente" <?= $account['status'] == 'pendente' ? 'selected' : '' ?>>Pendente</option>
-                                        <option value="paga" <?= $account['status'] == 'paga' ? 'selected' : '' ?>>Paga</option>
-                                    </select>
+                                    <div class="flex items-center gap-1">
+                                        <select name="status" id="status_<?= $account['id'] ?>"
+                                                class="text-xs px-2 py-1 rounded border-0 <?= 
+                                                    $account['status'] == 'paga' ? 'bg-green-100 text-green-800' : 
+                                                    ($account['status'] == 'pendente' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800') 
+                                                ?>">
+                                            <option value="pendente" <?= $account['status'] == 'pendente' ? 'selected' : '' ?>>Pendente</option>
+                                            <option value="paga" <?= $account['status'] == 'paga' ? 'selected' : '' ?>>Paga</option>
+                                        </select>
+                                        <button type="submit" class="text-xs px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600">
+                                            ✓
+                                        </button>
+                                    </div>
                                 </form>
                             </td>
                             <td class="px-6 py-4 text-sm">
@@ -624,14 +655,19 @@ if ($action == 'list') {
                                     <?php if (!empty($sortOrder)): ?>
                                     <input type="hidden" name="sort_order" value="<?= htmlspecialchars($sortOrder) ?>">
                                     <?php endif; ?>
-                                    <select name="status" onchange="this.form.submit()" 
-                                            class="text-xs px-2 py-1 rounded border-0 <?= 
-                                                $account['status'] == 'recebida' ? 'bg-green-100 text-green-800' : 
-                                                ($account['status'] == 'pendente' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800') 
-                                            ?>">
-                                        <option value="pendente" <?= $account['status'] == 'pendente' ? 'selected' : '' ?>>Pendente</option>
-                                        <option value="recebida" <?= $account['status'] == 'recebida' ? 'selected' : '' ?>>Recebida</option>
-                                    </select>
+                                    <div class="flex items-center gap-1">
+                                        <select name="status" id="status_<?= $account['id'] ?>"
+                                                class="text-xs px-2 py-1 rounded border-0 <?= 
+                                                    $account['status'] == 'recebida' ? 'bg-green-100 text-green-800' : 
+                                                    ($account['status'] == 'pendente' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800') 
+                                                ?>">
+                                            <option value="pendente" <?= $account['status'] == 'pendente' ? 'selected' : '' ?>>Pendente</option>
+                                            <option value="recebida" <?= $account['status'] == 'recebida' ? 'selected' : '' ?>>Recebida</option>
+                                        </select>
+                                        <button type="submit" class="text-xs px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600">
+                                            ✓
+                                        </button>
+                                    </div>
                                 </form>
                             </td>
                             <td class="px-6 py-4 text-sm">

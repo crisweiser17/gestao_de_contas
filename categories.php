@@ -18,6 +18,9 @@ $success = '';
 
 // Processar ações
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    // Override action and categoryId from POST if available
+    $action = $_POST['action'] ?? $action;
+    $categoryId = $_POST['id'] ?? $categoryId;
     if ($action == 'add' || $action == 'edit') {
         $data = [
             'user_id' => $userId,
@@ -56,15 +59,35 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             }
         }
     } else if ($action == 'delete' && $categoryId) {
-        $result = $categoryModel->delete($categoryId, $userId);
+        $migrateToCategoryId = $_POST['migrate_to_category_id'] ?? null;
+        $result = $categoryModel->delete($categoryId, $userId, $migrateToCategoryId);
         if ($result === true) {
-            $success = 'Categoria excluída com sucesso!';
+            if ($migrateToCategoryId) {
+                $success = 'Categoria excluída com sucesso! As contas foram migradas para a nova categoria.';
+            } else {
+                $success = 'Categoria excluída com sucesso!';
+            }
         } else if ($result === 'has_accounts') {
-            $errors[] = 'Não é possível excluir esta categoria pois existem contas associadas a ela';
+            // Buscar categorias disponíveis para migração (exceto a que está sendo excluída)
+            $availableCategories = $categoryModel->getByUserId($userId);
+            $availableCategories = array_filter($availableCategories, function($cat) use ($categoryId) {
+                return $cat['id'] != $categoryId;
+            });
+            
+            if (empty($availableCategories)) {
+                $errors[] = 'Não é possível excluir esta categoria pois existem contas associadas e não há outras categorias disponíveis para migração.';
+            } else {
+                // Mostrar formulário de migração
+                $action = 'confirm_delete';
+                $categoryToDelete = $categoryModel->getById($categoryId, $userId);
+            }
         } else {
             $errors[] = 'Erro ao excluir categoria';
         }
-        $action = 'list';
+        
+        if ($action != 'confirm_delete') {
+            $action = 'list';
+        }
     }
 }
 
@@ -121,6 +144,56 @@ if ($action == 'list') {
         <div class="mb-6 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
             <i class="fas fa-check-circle mr-2"></i>
             <?= htmlspecialchars($success) ?>
+        </div>
+        <?php endif; ?>
+
+        <?php if ($action == 'confirm_delete'): ?>
+        <!-- Formulário de Confirmação de Exclusão com Migração -->
+        <div class="bg-white rounded-lg shadow p-6 mb-8">
+            <div class="flex items-center mb-4">
+                <i class="fas fa-exclamation-triangle text-yellow-500 text-2xl mr-3"></i>
+                <h2 class="text-xl font-semibold text-gray-900">Confirmar Exclusão de Categoria</h2>
+            </div>
+            
+            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+                <p class="text-gray-700 mb-2">
+                    A categoria <strong>"<?= htmlspecialchars($categoryToDelete['name']) ?>"</strong> possui contas associadas.
+                </p>
+                <p class="text-gray-700">
+                    Para continuar com a exclusão, selecione uma categoria de destino para migrar essas contas:
+                </p>
+            </div>
+
+            <form method="POST" class="space-y-4">
+                <input type="hidden" name="action" value="delete">
+                <input type="hidden" name="id" value="<?= htmlspecialchars($categoryId) ?>">
+                
+                <div>
+                    <label for="migrate_to_category_id" class="block text-sm font-medium text-gray-700 mb-2">
+                        Migrar contas para:
+                    </label>
+                    <select name="migrate_to_category_id" id="migrate_to_category_id" required 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                        <option value="">Selecione uma categoria...</option>
+                        <?php foreach ($availableCategories as $category): ?>
+                        <option value="<?= htmlspecialchars($category['id']) ?>">
+                            <?= htmlspecialchars($category['name']) ?> (<?= ucfirst($category['type']) ?>)
+                        </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <div class="flex space-x-4">
+                    <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-md transition-colors">
+                        <i class="fas fa-trash mr-2"></i>
+                        Confirmar Exclusão
+                    </button>
+                    <a href="?action=list" class="bg-gray-300 hover:bg-gray-400 text-gray-700 px-6 py-2 rounded-md transition-colors">
+                        <i class="fas fa-times mr-2"></i>
+                        Cancelar
+                    </a>
+                </div>
+            </form>
         </div>
         <?php endif; ?>
 

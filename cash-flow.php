@@ -38,9 +38,8 @@ function calculateCashFlowProjection($userId, $days) {
     // Buscar saldo atual (contas já pagas/recebidas)
     $currentBalance = $accountModel->getCurrentBalance($userId);
     
-    // Buscar contas pendentes no período
-    $pendingAccounts = $accountModel->getWithFilters($userId, [
-        'status' => 'pendente',
+    // Buscar TODAS as contas no período (pendentes, pagas e recebidas)
+    $allAccountsInPeriod = $accountModel->getWithFilters($userId, [
         'date_from' => $startDate,
         'date_to' => $endDate
     ]);
@@ -48,8 +47,8 @@ function calculateCashFlowProjection($userId, $days) {
     // Gerar contas recorrentes para o período
     $recurringAccounts = $recurringModel->generateProjections($userId, $days);
     
-    // Combinar contas pendentes e recorrentes
-    $allAccounts = array_merge($pendingAccounts, $recurringAccounts);
+    // Combinar contas do período e recorrentes
+    $allAccounts = array_merge($allAccountsInPeriod, $recurringAccounts);
     
     // Organizar por data
     usort($allAccounts, function($a, $b) {

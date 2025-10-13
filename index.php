@@ -234,13 +234,19 @@ $recentTransactions = $accountModel->getRecentTransactions($userId, 10);
                     <div class="p-6">
                         <div class="space-y-3">
                             <?php foreach ($overdueAccounts as $account): ?>
-                            <div class="flex items-center justify-between p-3 bg-red-50 rounded-lg">
-                                <div>
+                            <div class="flex items-center justify-between p-3 bg-red-50 rounded-lg border-l-4 <?= $account['type'] == 'receita' ? 'border-green-500' : 'border-red-500' ?>">
+                                <div class="flex-1">
+                                    <div class="flex items-center mb-1">
+                                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium mr-2 <?= $account['type'] == 'receita' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' ?>">
+                                            <i class="fas <?= $account['type'] == 'receita' ? 'fa-arrow-down' : 'fa-arrow-up' ?> mr-1"></i>
+                                            <?= $account['type'] == 'receita' ? 'A Receber' : 'A Pagar' ?>
+                                        </span>
+                                    </div>
                                     <p class="font-medium text-gray-900"><?= htmlspecialchars($account['description']) ?></p>
                                     <p class="text-sm text-gray-600"><?= formatDate($account['due_date']) ?></p>
                                 </div>
                                 <div class="text-right">
-                                    <p class="font-bold text-red-600"><?= formatCurrency($account['amount']) ?></p>
+                                    <p class="font-bold <?= $account['type'] == 'receita' ? 'text-green-600' : 'text-red-600' ?>"><?= formatCurrency($account['amount']) ?></p>
                                     <span class="text-xs bg-red-100 text-red-800 px-2 py-1 rounded"><?= ucfirst($account['status']) ?></span>
                                 </div>
                             </div>

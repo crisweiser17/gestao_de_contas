@@ -204,7 +204,7 @@ class Category {
     /**
      * Método para deletar uma categoria
      */
-    public function delete($id, $userId = null) {
+    public function delete($id, $userId = null, $migrateToCategoryId = null) {
         // Verificar se há contas associadas
         $queryCheck = 'SELECT COUNT(*) FROM accounts WHERE category_id = ?';
         $params = [$id];
@@ -214,9 +214,27 @@ class Category {
         }
         $checkStmt = $this->pdo->prepare($queryCheck);
         $checkStmt->execute($params);
-        if ($checkStmt->fetchColumn() > 0) {
-            return 'has_accounts';
+        $accountsCount = $checkStmt->fetchColumn();
+        
+        if ($accountsCount > 0) {
+            // Se há contas associadas mas não foi fornecida categoria de destino
+            if ($migrateToCategoryId === null) {
+                return 'has_accounts';
+            }
+            
+            // Migrar contas para a nova categoria
+            $queryMigrate = 'UPDATE accounts SET category_id = ? WHERE category_id = ?';
+            $paramsMigrate = [$migrateToCategoryId, $id];
+            if ($userId !== null) {
+                $queryMigrate .= ' AND user_id = ?';
+                $paramsMigrate[] = $userId;
+            }
+            $migrateStmt = $this->pdo->prepare($queryMigrate);
+            if (!$migrateStmt->execute($paramsMigrate)) {
+                return false;
+            }
         }
+        
         // Excluir categoria (restrita ao usuário se fornecido)
         $queryDel = 'DELETE FROM categories WHERE id = ?';
         $params = [$id];
