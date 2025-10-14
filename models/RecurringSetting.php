@@ -65,27 +65,30 @@ class RecurringSetting {
     }
 
     // Calcular próxima data baseada na frequência
-    public function calculateNextDate($currentDate, $frequencyType, $frequencyInterval = 1) {
+    public function calculateNextDate($currentDate, $frequencyType, $frequencyInterval = 1, $originalDate = null) {
         $date = new DateTime($currentDate);
+        
+        // Se não foi fornecida a data original, usa a data atual como referência
+        $originalDay = $originalDate ? (int)(new DateTime($originalDate))->format('d') : (int)$date->format('d');
         
         switch ($frequencyType) {
             case 'semanal':
                 $date->add(new DateInterval('P7D'));
                 break;
             case 'mensal':
-                $date->add(new DateInterval('P1M'));
+                $date = $this->addMonthsWithDayAdjustment($date, 1, $originalDay);
                 break;
             case 'bimestral':
-                $date->add(new DateInterval('P2M'));
+                $date = $this->addMonthsWithDayAdjustment($date, 2, $originalDay);
                 break;
             case 'trimestral':
-                $date->add(new DateInterval('P3M'));
+                $date = $this->addMonthsWithDayAdjustment($date, 3, $originalDay);
                 break;
             case 'semestral':
-                $date->add(new DateInterval('P6M'));
+                $date = $this->addMonthsWithDayAdjustment($date, 6, $originalDay);
                 break;
             case 'anual':
-                $date->add(new DateInterval('P1Y'));
+                $date = $this->addMonthsWithDayAdjustment($date, 12, $originalDay);
                 break;
             case 'personalizado':
                 $date->add(new DateInterval('P' . $frequencyInterval . 'D'));
@@ -93,6 +96,34 @@ class RecurringSetting {
         }
         
         return $date->format('Y-m-d');
+    }
+
+    // Adicionar meses com ajuste de dia (antecipa quando o dia não existe no mês)
+    private function addMonthsWithDayAdjustment($date, $months, $originalDay) {
+        // Pega ano e mês atuais
+        $year = (int)$date->format('Y');
+        $month = (int)$date->format('m');
+        
+        // Adiciona os meses
+        $month += $months;
+        
+        // Ajusta ano se necessário
+        while ($month > 12) {
+            $month -= 12;
+            $year++;
+        }
+        
+        // Verifica quantos dias tem o mês de destino
+        $daysInMonth = cal_days_in_month(CAL_GREGORIAN, $month, $year);
+        
+        // Se o dia original não existe no mês de destino, usa o último dia do mês
+        $targetDay = min($originalDay, $daysInMonth);
+        
+        // Cria a nova data
+        $newDate = new DateTime();
+        $newDate->setDate($year, $month, $targetDay);
+        
+        return $newDate;
     }
 
     // Buscar contas que precisam gerar recorrências
@@ -179,8 +210,8 @@ class RecurringSetting {
                 }
             }
             
-            // Calcular próxima data
-            $currentDate = $this->calculateNextDate($currentDate, $setting['frequency_type'], $setting['frequency_interval']);
+            // Calcular próxima data (usando a data original da conta como referência)
+            $currentDate = $this->calculateNextDate($currentDate, $setting['frequency_type'], $setting['frequency_interval'], $account['due_date']);
         }
         
         // Atualizar next_generation_date
@@ -310,8 +341,8 @@ class RecurringSetting {
                     'parent_id' => $account['id']
                 ];
                 
-                // Calcular próxima data
-                $currentDate = $this->calculateNextDate($currentDate, $account['frequency_type'], $account['frequency_interval']);
+                // Calcular próxima data (usando a data original da conta como referência)
+                $currentDate = $this->calculateNextDate($currentDate, $account['frequency_type'], $account['frequency_interval'], $account['due_date']);
                 $occurrenceCount++;
             }
         }

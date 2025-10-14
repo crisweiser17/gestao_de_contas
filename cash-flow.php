@@ -231,7 +231,7 @@ function formatMonthYear($date) {
                 </h3>
             </div>
             <div class="p-6">
-                <canvas id="cashFlowChart" height="100"></canvas>
+                <canvas id="cashFlowChart" height="300"></canvas>
             </div>
         </div>
 

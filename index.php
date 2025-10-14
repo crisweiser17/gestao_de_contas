@@ -248,6 +248,15 @@ $recentTransactions = $accountModel->getRecentTransactions($userId, 10);
                                 <div class="text-right">
                                     <p class="font-bold <?= $account['type'] == 'receita' ? 'text-green-600' : 'text-red-600' ?>"><?= formatCurrency($account['amount']) ?></p>
                                     <span class="text-xs bg-red-100 text-red-800 px-2 py-1 rounded"><?= ucfirst($account['status']) ?></span>
+                                    <form method="POST" action="index.php" class="mt-2 inline-block">
+                                        <input type="hidden" name="action" value="update_status">
+                                        <input type="hidden" name="id" value="<?= $account['id'] ?>">
+                                        <input type="hidden" name="status" value="<?= $account['type'] == 'despesa' ? 'paga' : 'recebida' ?>">
+                                        <button type="submit" class="text-xs px-3 py-1 rounded-md border <?= $account['type'] == 'despesa' ? 'border-red-300 text-red-700 hover:bg-red-50' : 'border-green-300 text-green-700 hover:bg-green-50' ?>">
+                                            <i class="fas <?= $account['type'] == 'despesa' ? 'fa-check' : 'fa-check' ?> mr-1"></i>
+                                            <?= $account['type'] == 'despesa' ? 'Marcar como Paga' : 'Marcar como Recebida' ?>
+                                        </button>
+                                    </form>
                                 </div>
                             </div>
                             <?php endforeach; ?>

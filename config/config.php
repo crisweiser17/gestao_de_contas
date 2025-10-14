@@ -2,7 +2,7 @@
 // Configurações gerais da aplicação
 define('APP_NAME', 'Gestão de Contas');
 define('APP_VERSION', '1.0.0');
-define('BASE_URL', 'http://localhost/moneyview/');
+define('BASE_URL', 'http://localhost:8085/');
 
 // Configurações de timezone
 date_default_timezone_set('America/Sao_Paulo');
