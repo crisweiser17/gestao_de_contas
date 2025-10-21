@@ -8,7 +8,9 @@ define('BASE_URL', 'http://gestaodecontas.crisweiser.com/');
 date_default_timezone_set('America/Sao_Paulo');
 
 // Configurações de sessão
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // Configurações de erro (desabilitar em produção)
 error_reporting(E_ALL);

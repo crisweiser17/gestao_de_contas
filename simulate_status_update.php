@@ -1,6 +1,5 @@
 <?php
 // Script para simular exatamente o que acontece no accounts.php
-session_start();
 require_once 'config/config.php';
 require_once 'models/Account.php';
 require_once 'models/Category.php';

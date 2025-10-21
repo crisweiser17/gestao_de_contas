@@ -1,6 +1,5 @@
 <?php
 // Teste final para confirmar que o problema de status foi corrigido
-session_start();
 require_once 'config/config.php';
 require_once 'models/Account.php';
 
