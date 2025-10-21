@@ -287,6 +287,32 @@ class Category {
         // Este método pode ser implementado posteriormente com estatísticas reais
         return [];
     }
+
+    /**
+     * Criar categorias padrão para um novo usuário
+     */
+    public function createDefaultCategories($userId) {
+        $defaultCategories = [
+            ['name' => 'Receitas', 'type' => 'receita', 'color' => '#10B981'],
+            ['name' => 'Alimentação', 'type' => 'despesa', 'color' => '#F59E0B'],
+            ['name' => 'Transporte', 'type' => 'despesa', 'color' => '#3B82F6'],
+            ['name' => 'Outros', 'type' => 'despesa', 'color' => '#6B7280']
+        ];
+
+        foreach ($defaultCategories as $category) {
+            try {
+                $this->create([
+                    'name' => $category['name'],
+                    'user_id' => $userId,
+                    'type' => $category['type'],
+                    'color' => $category['color']
+                ]);
+            } catch (Exception $e) {
+                // Log do erro, mas continua criando as outras categorias
+                error_log("Erro ao criar categoria padrão '{$category['name']}': " . $e->getMessage());
+            }
+        }
+    }
 }
 
 /*

@@ -1,4 +1,11 @@
 <?php
+require_once 'config/config.php';
+
+// Se não estiver logado, redireciona para login
+if (!isLoggedIn()) {
+    redirect('login.php');
+}
+
 // Teste para verificar se a correção do Category.php funcionou no projeto moneyview
 echo "=== TESTE DE CORREÇÃO DO CATEGORY.PHP NO MONEYVIEW ===\n\n";
 

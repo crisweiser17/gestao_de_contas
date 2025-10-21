@@ -93,15 +93,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     </a>
                 </p>
             </div>
-
-            <!-- Dados de teste -->
-            <div class="mt-6 p-4 bg-gray-100 rounded-md">
-                <h3 class="text-sm font-medium text-gray-700 mb-2">Dados para teste:</h3>
-                <p class="text-sm text-gray-600">
-                    <strong>Email:</strong> teste@moneyview.com<br>
-                    <strong>Senha:</strong> password
-                </p>
-            </div>
         </div>
     </div>
 </body>

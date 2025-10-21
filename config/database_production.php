@@ -1,10 +1,13 @@
 <?php
-// Configurações de banco de dados para DESENVOLVIMENTO LOCAL
+// Configurações de banco de dados para PRODUÇÃO
+// IMPORTANTE: Ajuste as configurações abaixo para seu hosting
+
 class Database {
-    private $host = 'localhost';
-    private $db_name = 'moneyview';
-    private $username = 'root';
-    private $password = '';  // Senha vazia para MySQL local
+    // ALTERE ESTAS CONFIGURAÇÕES PARA SEU HOSTING
+    private $host = 'localhost';           // Host do banco (ex: localhost, mysql.seuhost.com)
+    private $db_name = 'moneyview';        // Nome do banco de dados
+    private $username = 'seu_usuario';     // Usuário do banco
+    private $password = 'sua_senha';       // Senha do banco
     private $conn;
 
     public function getConnection() {
@@ -23,8 +26,9 @@ class Database {
                 ]
             );
         } catch(PDOException $exception) {
-            echo "Erro de conexão: " . $exception->getMessage();
-            die();
+            // Em produção, não exibir detalhes do erro
+            error_log("Erro de conexão com banco: " . $exception->getMessage());
+            die("Erro interno do servidor. Tente novamente mais tarde.");
         }
         
         return $this->conn;

@@ -4,7 +4,6 @@ function render_header($active) {
         'index' => ['label' => 'Dashboard', 'href' => 'index.php'],
         'accounts' => ['label' => 'Contas', 'href' => 'accounts.php'],
         'reports' => ['label' => 'Relatórios', 'href' => 'reports.php'],
-        'logout' => ['label' => 'Sair', 'href' => 'logout.php', 'danger' => true],
     ];
     ?>
     <header class="bg-white shadow-sm border-b">
@@ -16,7 +15,9 @@ function render_header($active) {
                         <?= APP_NAME ?>
                     </h1>
                 </div>
-                <nav class="flex space-x-4">
+                
+                <div class="flex items-center justify-between w-full">
+                    <nav class="flex space-x-4">
                     <?php foreach ($items as $key => $item): ?>
                         <?php 
                             // Classes padrão
@@ -64,7 +65,30 @@ function render_header($active) {
                             <a href="<?= $item['href'] ?>" class="<?= $classes ?>"><?= $item['label'] ?></a>
                         <?php endif; ?>
                     <?php endforeach; ?>
-                </nav>
+                    </nav>
+                    
+                    <!-- Menu do usuário -->
+                    <?php if (isset($_SESSION['user_name'])): ?>
+                        <div class="relative group">
+                            <button type="button" class="flex items-center text-gray-600 hover:text-primary cursor-default">
+                                <i class="fas fa-user text-sm mr-2"></i>
+                                <span class="text-sm">Olá, <?= htmlspecialchars($_SESSION['user_name']) ?></span>
+                                <i class="fas fa-caret-down ml-1 text-xs"></i>
+                            </button>
+                            <div class="absolute right-0 top-full w-44 bg-white border border-gray-200 rounded shadow-lg p-2 hidden group-hover:block hover:block focus-within:block z-20">
+                                <a href="profile.php" class="block px-3 py-2 rounded text-gray-700 hover:bg-gray-100">
+                                    <i class="fas fa-user-cog mr-2"></i>
+                                    Perfil
+                                </a>
+                                <hr class="my-1 border-gray-200">
+                                <a href="logout.php" class="block px-3 py-2 rounded text-red-600 hover:bg-red-50">
+                                    <i class="fas fa-sign-out-alt mr-2"></i>
+                                    Sair
+                                </a>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+                </div>
             </div>
         </div>
     </header>
