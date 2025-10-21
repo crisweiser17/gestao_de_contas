@@ -5,9 +5,13 @@ class Account {
     private $conn;
     private $table_name = "accounts";
 
-    public function __construct() {
-        $database = new Database();
-        $this->conn = $database->getConnection();
+    public function __construct($pdo = null) {
+        if ($pdo !== null) {
+            $this->conn = $pdo;
+        } else {
+            $database = new Database();
+            $this->conn = $database->getConnection();
+        }
     }
 
     // Buscar total mensal por tipo (receita/despesa)

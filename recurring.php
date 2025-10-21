@@ -10,7 +10,7 @@ require_once 'models/Account.php';
 require_once 'models/Category.php';
 require_once 'models/RecurringSetting.php';
 
-$accountModel = new Account();
+$accountModel = new Account($pdo);
 $categoryModel = new Category($pdo);
 $recurringModel = new RecurringSetting();
 

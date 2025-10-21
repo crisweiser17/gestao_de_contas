@@ -9,7 +9,7 @@ if (!isLoggedIn()) {
 require_once 'models/Account.php';
 require_once 'models/Category.php';
 
-$accountModel = new Account();
+$accountModel = new Account($pdo);
 $categoryModel = new Category($pdo);
 
 $userId = $_SESSION['user_id'];
