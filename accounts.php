@@ -31,6 +31,14 @@ try {
         redirect('login.php');
     }
 }
+
+// Executar manutenção leve das contas recorrentes (em background)
+try {
+    $recurringModel->lightMaintenance($userId);
+} catch (Exception $e) {
+    // Falha silenciosa - não deve interromper o carregamento da página
+    error_log("Erro na manutenção de recorrências: " . $e->getMessage());
+}
 $action = $_GET['action'] ?? 'list';
 $accountId = $_GET['id'] ?? null;
 
@@ -255,6 +263,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         'category_id' => $_POST['filter_category_id'] ?? $_GET['filter_category'] ?? '',
         'type' => $_POST['filter_type'] ?? $_GET['filter_type'] ?? '',
         'status' => $_POST['filter_status'] ?? $_GET['filter_status'] ?? '',
+        'date_filter_type' => $_POST['filter_date_filter_type'] ?? $_GET['filter_date_filter_type'] ?? '',
+        'date_month' => $_POST['filter_date_month'] ?? $_GET['filter_date_month'] ?? '',
+        'date_year' => $_POST['filter_date_year'] ?? $_POST['filter_date_year_only'] ?? $_GET['filter_date_year'] ?? $_GET['filter_date_year_only'] ?? '',
         'date_from' => $_POST['filter_date_from'] ?? $_GET['filter_date_from'] ?? '',
         'date_to' => $_POST['filter_date_to'] ?? $_GET['filter_date_to'] ?? ''
     ];
@@ -263,18 +274,42 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         'category_id' => $_GET['filter_category'] ?? '',
         'type' => $_GET['filter_type'] ?? '',
         'status' => $_GET['filter_status'] ?? '',
+        'date_filter_type' => $_GET['filter_date_filter_type'] ?? '',
+        'date_month' => $_GET['filter_date_month'] ?? '',
+        'date_year' => $_GET['filter_date_year'] ?? $_GET['filter_date_year_only'] ?? '',
         'date_from' => $_GET['filter_date_from'] ?? '',
         'date_to' => $_GET['filter_date_to'] ?? ''
     ];
 }
 
+// Processar filtros de data baseado no tipo selecionado
+if (!empty($filters['date_filter_type'])) {
+    switch ($filters['date_filter_type']) {
+        case 'month_year':
+            if (!empty($filters['date_month']) && !empty($filters['date_year'])) {
+                $filters['date_from'] = $filters['date_year'] . '-' . str_pad($filters['date_month'], 2, '0', STR_PAD_LEFT) . '-01';
+                $filters['date_to'] = date('Y-m-t', strtotime($filters['date_from']));
+            }
+            break;
+        case 'year':
+            if (!empty($filters['date_year'])) {
+                $filters['date_from'] = $filters['date_year'] . '-01-01';
+                $filters['date_to'] = $filters['date_year'] . '-12-31';
+            }
+            break;
+        case 'custom':
+            // Manter os valores de date_from e date_to como estão
+            break;
+    }
+}
+
 // Parâmetros de ordenação (preservar após POST)
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $sortBy = $_POST['sort_by'] ?? $_GET['sort_by'] ?? 'due_date';
-    $sortOrder = $_POST['sort_order'] ?? $_GET['sort_order'] ?? 'DESC';
+    $sortOrder = $_POST['sort_order'] ?? $_GET['sort_order'] ?? 'ASC';
 } else {
     $sortBy = $_GET['sort_by'] ?? 'due_date';
-    $sortOrder = $_GET['sort_order'] ?? 'DESC';
+    $sortOrder = $_GET['sort_order'] ?? 'ASC';
 }
 
 // Validar parâmetros de ordenação
@@ -285,17 +320,44 @@ if (!in_array($sortBy, $validSortColumns)) {
 
 $validSortOrders = ['ASC', 'DESC'];
 if (!in_array(strtoupper($sortOrder), $validSortOrders)) {
-    $sortOrder = 'DESC';
+    $sortOrder = 'ASC';
+}
+
+// Parâmetros de paginação
+$itemsPerPageExpenses = (int)($_GET['items_per_page_expenses'] ?? 25);
+$itemsPerPageRevenues = (int)($_GET['items_per_page_revenues'] ?? 25);
+$pageExpenses = max(1, (int)($_GET['page_expenses'] ?? 1));
+$pageRevenues = max(1, (int)($_GET['page_revenues'] ?? 1));
+
+// Validar itens por página
+$validItemsPerPage = [25, 50, 100];
+if (!in_array($itemsPerPageExpenses, $validItemsPerPage)) {
+    $itemsPerPageExpenses = 25;
+}
+if (!in_array($itemsPerPageRevenues, $validItemsPerPage)) {
+    $itemsPerPageRevenues = 25;
 }
 
 if ($action == 'list') {
     // Buscar contas a pagar (despesas)
     $filtersExpenses = array_merge(array_filter($filters), ['type' => 'despesa']);
-    $accountsExpenses = $accountModel->getWithFilters($userId, $filtersExpenses, $sortBy, $sortOrder);
+    $totalExpenses = $accountModel->countWithFilters($userId, $filtersExpenses);
+    $offsetExpenses = ($pageExpenses - 1) * $itemsPerPageExpenses;
+    $accountsExpenses = $accountModel->getWithFilters($userId, $filtersExpenses, $sortBy, $sortOrder, $itemsPerPageExpenses, $offsetExpenses);
     
     // Buscar contas a receber (receitas)
     $filtersRevenues = array_merge(array_filter($filters), ['type' => 'receita']);
-    $accountsRevenues = $accountModel->getWithFilters($userId, $filtersRevenues, $sortBy, $sortOrder);
+    $totalRevenues = $accountModel->countWithFilters($userId, $filtersRevenues);
+    $offsetRevenues = ($pageRevenues - 1) * $itemsPerPageRevenues;
+    $accountsRevenues = $accountModel->getWithFilters($userId, $filtersRevenues, $sortBy, $sortOrder, $itemsPerPageRevenues, $offsetRevenues);
+    
+    // Calcular total de páginas
+    $totalPagesExpenses = ceil($totalExpenses / $itemsPerPageExpenses);
+    $totalPagesRevenues = ceil($totalRevenues / $itemsPerPageRevenues);
+    
+    // Calcular soma total dos valores filtrados
+    $totalAmountExpenses = $accountModel->sumWithFilters($userId, $filtersExpenses);
+    $totalAmountRevenues = $accountModel->sumWithFilters($userId, $filtersRevenues);
 } else if ($action == 'edit' && $accountId) {
     $account = $accountModel->getById($accountId, $userId);
     $recurringSetting = $recurringModel->getByAccountId($accountId);
@@ -365,38 +427,102 @@ if ($action == 'list') {
                     <i class="fas fa-filter mr-2"></i>
                     Filtros
                 </h3>
-                <form method="GET" class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <form method="GET">
                     <input type="hidden" name="action" value="list">
                     
-                    <select name="filter_category" class="border border-gray-300 rounded-md px-3 h-10 w-full">
-                        <option value="">Todas as categorias</option>
-                        <?php foreach ($categories as $category): ?>
-                        <option value="<?= $category['id'] ?>" <?= $filters['category_id'] == $category['id'] ? 'selected' : '' ?>>
-                            <?= (($category['type'] ?? '') === 'receita' ? '+' : '-') . ' ' . htmlspecialchars($category['name']) ?>
-                        </option>
-                        <?php endforeach; ?>
-                    </select>
+                    <!-- Todos os filtros em uma linha -->
+                    <div class="grid grid-cols-1 lg:grid-cols-6 gap-3 items-end">
+                        <!-- Categoria -->
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Categoria</label>
+                            <select name="filter_category" class="border border-gray-300 rounded-md px-3 h-10 w-full text-sm">
+                                <option value="">Todas</option>
+                                <?php foreach ($categories as $category): ?>
+                                <option value="<?= $category['id'] ?>" <?= $filters['category_id'] == $category['id'] ? 'selected' : '' ?>>
+                                    <?= (($category['type'] ?? '') === 'receita' ? '+' : '-') . ' ' . htmlspecialchars($category['name']) ?>
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
 
-                    <select name="filter_status" class="border border-gray-300 rounded-md px-3 h-10 w-full">
-                        <option value="">Todos os status</option>
-                        <option value="pendente" <?= $filters['status'] == 'pendente' ? 'selected' : '' ?>>Pendente</option>
-                        <option value="paga" <?= $filters['status'] == 'paga' ? 'selected' : '' ?>>Paga</option>
-                        <option value="recebida" <?= $filters['status'] == 'recebida' ? 'selected' : '' ?>>Recebida</option>
-                    </select>
+                        <!-- Status -->
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Status</label>
+                            <select name="filter_status" class="border border-gray-300 rounded-md px-3 h-10 w-full text-sm">
+                                <option value="">Todos</option>
+                                <option value="pendente" <?= $filters['status'] == 'pendente' ? 'selected' : '' ?>>Pendente</option>
+                                <option value="paga" <?= $filters['status'] == 'paga' ? 'selected' : '' ?>>Paga</option>
+                                <option value="recebida" <?= $filters['status'] == 'recebida' ? 'selected' : '' ?>>Recebida</option>
+                            </select>
+                        </div>
 
-                    <input type="date" name="filter_date_from" value="<?= $filters['date_from'] ?>" 
-                           placeholder="Data inicial" class="border border-gray-300 rounded-md px-3 h-10 w-full">
+                        <!-- Tipo de Filtro de Data -->
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Filtro de Data</label>
+                            <select name="filter_date_filter_type" id="dateFilterType" class="border border-gray-300 rounded-md px-3 h-10 w-full text-sm" onchange="toggleDateFilters()">
+                                <option value="">Sem filtro</option>
+                                <option value="month_year" <?= $filters['date_filter_type'] == 'month_year' ? 'selected' : '' ?>>Mês/Ano</option>
+                                <option value="year" <?= $filters['date_filter_type'] == 'year' ? 'selected' : '' ?>>Ano</option>
+                                <option value="custom" <?= $filters['date_filter_type'] == 'custom' ? 'selected' : '' ?>>Customizado</option>
+                            </select>
+                        </div>
 
-                    <input type="date" name="filter_date_to" value="<?= $filters['date_to'] ?>" 
-                           placeholder="Data final" class="border border-gray-300 rounded-md px-2 h-10 w-full">
+                        <!-- Filtros de Data Dinâmicos -->
+                        <div class="lg:col-span-2">
+                            <!-- Filtro Mês/Ano -->
+                            <div id="monthYearFilter" style="display: <?= $filters['date_filter_type'] == 'month_year' ? 'block' : 'none' ?>">
+                                <label class="block text-xs font-medium text-gray-700 mb-1">Mês/Ano</label>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <select name="filter_date_month" class="border border-gray-300 rounded-md px-3 h-10 w-full text-sm">
+                                        <option value="">Mês</option>
+                                        <?php for ($m = 1; $m <= 12; $m++): ?>
+                                        <option value="<?= $m ?>" <?= $filters['date_month'] == $m ? 'selected' : '' ?>>
+                                            <?= date('M', mktime(0, 0, 0, $m, 1)) ?>
+                                        </option>
+                                        <?php endfor; ?>
+                                    </select>
+                                    <select name="filter_date_year" class="border border-gray-300 rounded-md px-3 h-10 w-full text-sm">
+                                         <option value="">Ano</option>
+                                         <?php for ($y = 2025; $y <= date('Y') + 5; $y++): ?>
+                                         <option value="<?= $y ?>" <?= $filters['date_year'] == $y ? 'selected' : '' ?>><?= $y ?></option>
+                                         <?php endfor; ?>
+                                     </select>
+                                </div>
+                            </div>
 
-                    <div class="flex items-center space-x-2 w-full justify-end">
-                        <button type="submit" class="bg-gray-600 hover:bg-gray-700 text-white px-4 h-10 rounded-md shrink-0 flex items-center justify-center">
-                            <i class="fas fa-search"></i>
-                        </button>
-                        <a href="?action=list" class="bg-gray-400 hover:bg-gray-500 text-white px-4 h-10 rounded-md shrink-0 flex items-center justify-center">
-                            <i class="fas fa-times"></i>
-                        </a>
+                            <!-- Filtro Ano -->
+                            <div id="yearFilter" style="display: <?= $filters['date_filter_type'] == 'year' ? 'block' : 'none' ?>">
+                                <label class="block text-xs font-medium text-gray-700 mb-1">Ano</label>
+                                <select name="filter_date_year_only" class="border border-gray-300 rounded-md px-3 h-10 w-full text-sm">
+                                     <option value="">Selecione</option>
+                                     <?php for ($y = 2025; $y <= date('Y') + 5; $y++): ?>
+                                     <option value="<?= $y ?>" <?= $filters['date_year'] == $y ? 'selected' : '' ?>><?= $y ?></option>
+                                     <?php endfor; ?>
+                                 </select>
+                            </div>
+
+                            <!-- Filtro Customizado -->
+                            <div id="customFilter" style="display: <?= $filters['date_filter_type'] == 'custom' ? 'block' : 'none' ?>">
+                                <label class="block text-xs font-medium text-gray-700 mb-1">Período</label>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <input type="date" name="filter_date_from" value="<?= $filters['date_from'] ?>" 
+                                           class="border border-gray-300 rounded-md px-3 h-10 w-full text-sm">
+                                    <input type="date" name="filter_date_to" value="<?= $filters['date_to'] ?>" 
+                                           class="border border-gray-300 rounded-md px-3 h-10 w-full text-sm">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Botões -->
+                        <div class="flex items-end space-x-2">
+                            <button type="submit" class="bg-gray-600 hover:bg-gray-700 text-white px-4 h-10 rounded-md flex items-center justify-center text-sm">
+                                <i class="fas fa-search mr-1"></i>
+                                Filtrar
+                            </button>
+                            <a href="?action=list" class="bg-gray-400 hover:bg-gray-500 text-white px-3 h-10 rounded-md flex items-center justify-center text-sm">
+                                <i class="fas fa-times"></i>
+                            </a>
+                        </div>
                     </div>
                 </form>
             </div>
@@ -405,11 +531,38 @@ if ($action == 'list') {
         <!-- Contas a Pagar -->
         <div class="bg-white rounded-lg shadow mb-6">
             <div class="p-6 border-b border-gray-200">
-                <h2 class="text-xl font-semibold text-red-700">
-                    <i class="fas fa-credit-card mr-2"></i>
-                    Contas a Pagar
-                    <span class="text-sm font-normal text-gray-500 ml-2">(<?= count($accountsExpenses) ?> contas)</span>
-                </h2>
+                <div class="flex justify-between items-center">
+                    <h2 class="text-xl font-semibold text-red-700">
+                        <i class="fas fa-credit-card mr-2"></i>
+                        Contas a Pagar
+                        <span class="text-sm font-normal text-gray-500 ml-2">(<?= $totalExpenses ?> contas)</span>
+                    </h2>
+                    <div class="flex items-center space-x-4">
+                        <div class="flex items-center">
+                            <label for="items_per_page_expenses" class="text-sm text-gray-600 mr-2">Itens por página:</label>
+                            <select id="items_per_page_expenses" name="items_per_page_expenses" class="border border-gray-300 rounded px-2 py-1 text-sm" onchange="updatePagination('expenses')">
+                                <option value="25" <?= $itemsPerPageExpenses == 25 ? 'selected' : '' ?>>25</option>
+                                <option value="50" <?= $itemsPerPageExpenses == 50 ? 'selected' : '' ?>>50</option>
+                                <option value="100" <?= $itemsPerPageExpenses == 100 ? 'selected' : '' ?>>100</option>
+                            </select>
+                        </div>
+                        <?php if ($totalPagesExpenses > 1): ?>
+                        <div class="flex items-center space-x-2">
+                            <span class="text-sm text-gray-600">Página <?= $pageExpenses ?> de <?= $totalPagesExpenses ?></span>
+                            <?php if ($pageExpenses > 1): ?>
+                            <a href="?<?= http_build_query(array_merge($_GET, ['page_expenses' => $pageExpenses - 1])) ?>" class="px-2 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 text-sm">
+                                <i class="fas fa-chevron-left"></i>
+                            </a>
+                            <?php endif; ?>
+                            <?php if ($pageExpenses < $totalPagesExpenses): ?>
+                            <a href="?<?= http_build_query(array_merge($_GET, ['page_expenses' => $pageExpenses + 1])) ?>" class="px-2 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 text-sm">
+                                <i class="fas fa-chevron-right"></i>
+                            </a>
+                            <?php endif; ?>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
             </div>
 
             <div class="overflow-x-auto">
@@ -521,7 +674,7 @@ if ($action == 'list') {
                                     $fileExtension = strtolower(pathinfo($account['attachment'], PATHINFO_EXTENSION));
                                     $fileName = basename($account['attachment']);
                                     ?>
-                                    <a href="<?= htmlspecialchars($account['attachment']) ?>" target="_blank" 
+                                    <a href="javascript:void(0)" onclick="openLightbox('<?= htmlspecialchars($account['attachment']) ?>')" 
                                        class="inline-flex items-center text-blue-600 hover:text-blue-800 text-xs">
                                         <?php if ($fileExtension === 'pdf'): ?>
                                             <i class="fas fa-file-pdf mr-1 text-red-500"></i>
@@ -552,6 +705,26 @@ if ($action == 'list') {
                         </tr>
                         <?php endforeach; ?>
                         <?php endif; ?>
+                        
+                        <!-- Linha de Total -->
+                        <tr class="bg-red-50 border-t-2 border-red-200 font-semibold">
+                            <td class="px-6 py-4 text-red-700" colspan="3">
+                                <div class="flex items-center">
+                                    <i class="fas fa-calculator mr-2"></i>
+                                    Total Geral
+                                    <?php if ($totalExpenses > $itemsPerPageExpenses): ?>
+                                    <span class="ml-2 text-xs bg-red-100 text-red-600 px-2 py-1 rounded-full cursor-help" 
+                                          title="Este total inclui todas as <?= $totalExpenses ?> contas filtradas, não apenas as <?= min($itemsPerPageExpenses, count($accountsExpenses)) ?> exibidas nesta página">
+                                        <i class="fas fa-info-circle"></i>
+                                    </span>
+                                    <?php endif; ?>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 text-red-700 text-right font-bold text-lg">
+                                R$ <?= number_format($totalAmountExpenses, 2, ',', '.') ?>
+                            </td>
+                            <td class="px-6 py-4" colspan="3"></td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
@@ -560,11 +733,38 @@ if ($action == 'list') {
         <!-- Contas a Receber -->
         <div class="bg-white rounded-lg shadow">
             <div class="p-6 border-b border-gray-200">
-                <h2 class="text-xl font-semibold text-green-700">
-                    <i class="fas fa-money-bill-wave mr-2"></i>
-                    Contas a Receber
-                    <span class="text-sm font-normal text-gray-500 ml-2">(<?= count($accountsRevenues) ?> contas)</span>
-                </h2>
+                <div class="flex justify-between items-center">
+                    <h2 class="text-xl font-semibold text-green-700">
+                        <i class="fas fa-money-bill-wave mr-2"></i>
+                        Contas a Receber
+                        <span class="text-sm font-normal text-gray-500 ml-2">(<?= $totalRevenues ?> contas)</span>
+                    </h2>
+                    <div class="flex items-center space-x-4">
+                        <div class="flex items-center">
+                            <label for="items_per_page_revenues" class="text-sm text-gray-600 mr-2">Itens por página:</label>
+                            <select id="items_per_page_revenues" name="items_per_page_revenues" class="border border-gray-300 rounded px-2 py-1 text-sm" onchange="updatePagination('revenues')">
+                                <option value="25" <?= $itemsPerPageRevenues == 25 ? 'selected' : '' ?>>25</option>
+                                <option value="50" <?= $itemsPerPageRevenues == 50 ? 'selected' : '' ?>>50</option>
+                                <option value="100" <?= $itemsPerPageRevenues == 100 ? 'selected' : '' ?>>100</option>
+                            </select>
+                        </div>
+                        <?php if ($totalPagesRevenues > 1): ?>
+                        <div class="flex items-center space-x-2">
+                            <span class="text-sm text-gray-600">Página <?= $pageRevenues ?> de <?= $totalPagesRevenues ?></span>
+                            <?php if ($pageRevenues > 1): ?>
+                            <a href="?<?= http_build_query(array_merge($_GET, ['page_revenues' => $pageRevenues - 1])) ?>" class="px-2 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 text-sm">
+                                <i class="fas fa-chevron-left"></i>
+                            </a>
+                            <?php endif; ?>
+                            <?php if ($pageRevenues < $totalPagesRevenues): ?>
+                            <a href="?<?= http_build_query(array_merge($_GET, ['page_revenues' => $pageRevenues + 1])) ?>" class="px-2 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 text-sm">
+                                <i class="fas fa-chevron-right"></i>
+                            </a>
+                            <?php endif; ?>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
             </div>
 
             <div class="overflow-x-auto">
@@ -676,7 +876,7 @@ if ($action == 'list') {
                                     $fileExtension = strtolower(pathinfo($account['attachment'], PATHINFO_EXTENSION));
                                     $fileName = basename($account['attachment']);
                                     ?>
-                                    <a href="<?= htmlspecialchars($account['attachment']) ?>" target="_blank" 
+                                    <a href="javascript:void(0)" onclick="openLightbox('<?= htmlspecialchars($account['attachment']) ?>')" 
                                        class="inline-flex items-center text-blue-600 hover:text-blue-800 text-xs">
                                         <?php if ($fileExtension === 'pdf'): ?>
                                             <i class="fas fa-file-pdf mr-1 text-red-500"></i>
@@ -707,6 +907,26 @@ if ($action == 'list') {
                         </tr>
                         <?php endforeach; ?>
                         <?php endif; ?>
+                        
+                        <!-- Linha de Total -->
+                        <tr class="bg-green-50 border-t-2 border-green-200 font-semibold">
+                            <td class="px-6 py-4 text-green-700" colspan="3">
+                                <div class="flex items-center">
+                                    <i class="fas fa-calculator mr-2"></i>
+                                    Total Geral
+                                    <?php if ($totalRevenues > $itemsPerPageRevenues): ?>
+                                    <span class="ml-2 text-xs bg-green-100 text-green-600 px-2 py-1 rounded-full cursor-help" 
+                                          title="Este total inclui todas as <?= $totalRevenues ?> contas filtradas, não apenas as <?= min($itemsPerPageRevenues, count($accountsRevenues)) ?> exibidas nesta página">
+                                        <i class="fas fa-info-circle"></i>
+                                    </span>
+                                    <?php endif; ?>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 text-green-700 text-right font-bold text-lg">
+                                R$ <?= number_format($totalAmountRevenues, 2, ',', '.') ?>
+                            </td>
+                            <td class="px-6 py-4" colspan="3"></td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
@@ -837,7 +1057,7 @@ if ($action == 'list') {
                                 <div class="flex items-center">
                                     <i class="fas fa-file-alt text-blue-600 mr-2"></i>
                                     <span class="text-sm text-blue-800">Comprovante atual:</span>
-                                    <a href="<?= htmlspecialchars($account['attachment']) ?>" target="_blank" 
+                                    <a href="javascript:void(0)" onclick="openLightbox('<?= htmlspecialchars($account['attachment']) ?>')" 
                                        class="ml-2 text-blue-600 hover:underline text-sm">
                                         Ver arquivo
                                     </a>
@@ -942,7 +1162,107 @@ if ($action == 'list') {
         <?php endif; ?>
     </main>
 
+    <!-- Lightbox Modal -->
+    <div id="lightbox" class="fixed inset-0 bg-black bg-opacity-75 hidden z-50 flex items-center justify-center">
+        <div class="relative max-w-4xl max-h-full w-full h-full flex items-center justify-center p-4">
+            <!-- Botão de fechar -->
+            <button onclick="closeLightbox()" class="absolute top-4 right-4 text-white hover:text-gray-300 z-10">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+            
+            <!-- Conteúdo do lightbox -->
+            <div id="lightbox-content" class="w-full h-full flex items-center justify-center">
+                <!-- Conteúdo será inserido dinamicamente -->
+            </div>
+        </div>
+    </div>
+
+    <style>
+        #lightbox {
+            backdrop-filter: blur(4px);
+        }
+        
+        #lightbox iframe {
+            max-width: 90vw;
+            max-height: 90vh;
+            width: 100%;
+            height: 100%;
+            border: none;
+            border-radius: 8px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+        
+        #lightbox img {
+            max-width: 90vw;
+            max-height: 90vh;
+            object-fit: contain;
+            border-radius: 8px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+        
+        .lightbox-loading {
+            color: white;
+            font-size: 18px;
+            text-align: center;
+        }
+    </style>
+
     <script>
+        // Funções do Lightbox
+        function openLightbox(filePath) {
+            const lightbox = document.getElementById('lightbox');
+            const content = document.getElementById('lightbox-content');
+            
+            // Mostrar loading
+            content.innerHTML = '<div class="lightbox-loading">Carregando...</div>';
+            lightbox.classList.remove('hidden');
+            
+            // Detectar tipo de arquivo
+            const fileExtension = filePath.split('.').pop().toLowerCase();
+            const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'];
+            const pdfExtensions = ['pdf'];
+            
+            if (imageExtensions.includes(fileExtension)) {
+                // Exibir imagem
+                content.innerHTML = `<img src="${filePath}" alt="Comprovante" onload="this.style.opacity=1" style="opacity:0; transition: opacity 0.3s;">`;
+            } else if (pdfExtensions.includes(fileExtension)) {
+                // Exibir PDF em iframe
+                content.innerHTML = `<iframe src="${filePath}" onload="this.style.opacity=1" style="opacity:0; transition: opacity 0.3s;"></iframe>`;
+            } else {
+                // Outros tipos de arquivo - tentar iframe
+                content.innerHTML = `<iframe src="${filePath}" onload="this.style.opacity=1" style="opacity:0; transition: opacity 0.3s;"></iframe>`;
+            }
+        }
+        
+        function closeLightbox() {
+            const lightbox = document.getElementById('lightbox');
+            lightbox.classList.add('hidden');
+            
+            // Limpar conteúdo após animação
+            setTimeout(() => {
+                document.getElementById('lightbox-content').innerHTML = '';
+            }, 300);
+        }
+        
+        // Fechar lightbox ao clicar fora do conteúdo
+        document.addEventListener('DOMContentLoaded', function() {
+            const lightbox = document.getElementById('lightbox');
+            lightbox.addEventListener('click', function(e) {
+                if (e.target === lightbox) {
+                    closeLightbox();
+                }
+            });
+            
+            // Fechar com ESC
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape' && !lightbox.classList.contains('hidden')) {
+                    closeLightbox();
+                }
+            });
+        });
+
         function updateCategories() {
             const typeSelect = document.getElementById('type');
             const categorySelect = document.getElementById('category_id');
@@ -994,12 +1314,55 @@ if ($action == 'list') {
             selectElement.form.submit();
         }
 
+        function toggleDateFilters() {
+            const filterType = document.getElementById('dateFilterType');
+            const monthYearFilter = document.getElementById('monthYearFilter');
+            const yearFilter = document.getElementById('yearFilter');
+            const customFilter = document.getElementById('customFilter');
+            
+            // Esconder todos os filtros primeiro
+            monthYearFilter.style.display = 'none';
+            yearFilter.style.display = 'none';
+            customFilter.style.display = 'none';
+            
+            // Mostrar o filtro selecionado
+            switch (filterType.value) {
+                case 'month_year':
+                    monthYearFilter.style.display = 'grid';
+                    break;
+                case 'year':
+                    yearFilter.style.display = 'block';
+                    break;
+                case 'custom':
+                    customFilter.style.display = 'grid';
+                    break;
+            }
+        }
+
+        function updatePagination(type) {
+            const select = document.getElementById('items_per_page_' + type);
+            const itemsPerPage = select.value;
+            
+            // Obter parâmetros atuais da URL
+            const urlParams = new URLSearchParams(window.location.search);
+            
+            // Atualizar parâmetros
+            urlParams.set('items_per_page_' + type, itemsPerPage);
+            urlParams.set('page_' + type, '1'); // Resetar para primeira página
+            
+            // Redirecionar com novos parâmetros
+            window.location.href = '?' + urlParams.toString();
+        }
+
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
             updateCategories();
             if (document.getElementById('is_recurring')) {
                 toggleRecurringOptions();
                 toggleCustomInterval();
+            }
+            if (document.getElementById('dateFilterType')) {
+                toggleDateFilters();
             }
         });
     </script>

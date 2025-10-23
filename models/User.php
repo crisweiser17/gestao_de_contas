@@ -22,12 +22,26 @@ class User {
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if ($user && password_verify($password, $user['password'])) {
+            // Atualizar last_login
+            $this->updateLastLogin($user['id']);
+            
             // Remove a senha do retorno por segurança
             unset($user['password']);
             return $user;
         }
         
         return false;
+    }
+
+    // Atualizar último login do usuário
+    public function updateLastLogin($userId) {
+        $query = "UPDATE " . $this->table_name . " 
+                  SET last_login = CURRENT_TIMESTAMP 
+                  WHERE id = :id";
+        
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':id', $userId);
+        $stmt->execute();
     }
 
     // Criar novo usuário

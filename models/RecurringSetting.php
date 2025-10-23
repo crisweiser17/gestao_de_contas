@@ -144,6 +144,100 @@ class RecurringSetting {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    // Gerar instâncias recorrentes para os próximos meses (versão antiga - mantida para compatibilidade)
+    public function generateRecurringInstances($accountId, $userId, $monthsAhead = 12) {
+        return $this->generateRecurringInstancesAdvanced($accountId, $userId, $monthsAhead);
+    }
+
+    // Nova função para gerar instâncias com lógica avançada (até 120 meses)
+    public function generateRecurringInstancesAdvanced($accountId, $userId, $monthsAhead = null) {
+        $accountModel = new Account();
+        
+        // Buscar conta original e configuração
+        $account = $accountModel->getById($accountId, $userId);
+        $setting = $this->getByAccountId($accountId);
+        
+        if (!$account || !$setting || !$setting['is_active']) {
+            return false;
+        }
+
+        // Determinar quantos meses gerar baseado na estratégia proposta
+        if ($monthsAhead === null) {
+            $monthsAhead = $this->calculateOptimalMonthsAhead($setting);
+        }
+        
+        $generated = 0;
+        $currentDate = $setting['next_generation_date'];
+        $endDate = new DateTime();
+        $endDate->add(new DateInterval('P' . $monthsAhead . 'M'));
+        
+        // Contador de ocorrências já geradas
+        $existingCountQuery = "SELECT COUNT(*) as count FROM accounts 
+                              WHERE recurring_parent_id = :parent_id";
+        $existingCountStmt = $this->conn->prepare($existingCountQuery);
+        $existingCountStmt->bindParam(':parent_id', $accountId);
+        $existingCountStmt->execute();
+        $existingCount = $existingCountStmt->fetch(PDO::FETCH_ASSOC)['count'];
+        
+        while (new DateTime($currentDate) <= $endDate) {
+            // Verificar se deve parar por data final
+            if ($setting['end_date'] && new DateTime($currentDate) > new DateTime($setting['end_date'])) {
+                break;
+            }
+            
+            // Verificar se deve parar por máximo de ocorrências (incluindo já existentes)
+            if ($setting['max_occurrences'] && ($existingCount + $generated) >= $setting['max_occurrences']) {
+                break;
+            }
+            
+            // Verificar se já existe uma conta para esta data
+            $existingQuery = "SELECT COUNT(*) as count FROM accounts 
+                             WHERE recurring_parent_id = :parent_id AND due_date = :due_date";
+            $existingStmt = $this->conn->prepare($existingQuery);
+            $existingStmt->bindParam(':parent_id', $accountId);
+            $existingStmt->bindParam(':due_date', $currentDate);
+            $existingStmt->execute();
+            $existing = $existingStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($existing['count'] == 0) {
+                // Criar nova ocorrência
+                $newAccountData = [
+                    'user_id' => $account['user_id'],
+                    'category_id' => $account['category_id'],
+                    'description' => $account['description'],
+                    'amount' => $account['amount'],
+                    'due_date' => $currentDate,
+                    'type' => $account['type'],
+                    'status' => 'pendente',
+                    'url' => $account['url'],
+                    'is_recurring' => false,
+                    'notes' => $account['notes']
+                ];
+                
+                $newAccountId = $accountModel->create($newAccountData);
+                
+                if ($newAccountId) {
+                    // Atualizar com parent_id
+                    $updateQuery = "UPDATE accounts SET recurring_parent_id = :parent_id WHERE id = :id";
+                    $updateStmt = $this->conn->prepare($updateQuery);
+                    $updateStmt->bindParam(':parent_id', $accountId);
+                    $updateStmt->bindParam(':id', $newAccountId);
+                    $updateStmt->execute();
+                    
+                    $generated++;
+                }
+            }
+            
+            // Calcular próxima data (usando a data original da conta como referência)
+            $currentDate = $this->calculateNextDate($currentDate, $setting['frequency_type'], $setting['frequency_interval'], $account['due_date']);
+        }
+        
+        // Atualizar next_generation_date
+        $this->updateNextGenerationDate($accountId, $currentDate);
+        
+        return $generated;
+    }
+
     // Gerar próximas ocorrências de uma conta recorrente
     public function generateNextOccurrences($accountId, $userId, $monthsAhead = 12) {
         require_once 'models/Account.php';
@@ -216,6 +310,188 @@ class RecurringSetting {
         
         // Atualizar next_generation_date
         $this->updateNextGenerationDate($accountId, $currentDate);
+        
+        return $generated;
+    }
+
+    // Calcular quantos meses gerar baseado na estratégia proposta
+    private function calculateOptimalMonthsAhead($setting) {
+        // Se tem data final, calcular quantos meses até lá
+        if ($setting['end_date']) {
+            $now = new DateTime();
+            $endDate = new DateTime($setting['end_date']);
+            $diff = $now->diff($endDate);
+            $monthsUntilEnd = ($diff->y * 12) + $diff->m;
+            
+            // Se tem menos de 120 meses até o fim, gerar tudo
+            if ($monthsUntilEnd <= 120) {
+                return $monthsUntilEnd + 1; // +1 para garantir
+            }
+        }
+        
+        // Se tem máximo de ocorrências definido
+        if ($setting['max_occurrences']) {
+            // Calcular quantos meses seriam necessários baseado na frequência
+            $monthsPerOccurrence = $this->getMonthsPerOccurrence($setting['frequency_type']);
+            $totalMonths = $setting['max_occurrences'] * $monthsPerOccurrence;
+            
+            // Se tem menos de 120 meses de duração total, gerar tudo
+            if ($totalMonths <= 120) {
+                return $totalMonths + 12; // +12 para margem
+            }
+        }
+        
+        // Caso padrão: gerar 120 meses (10 anos)
+        return 120;
+    }
+
+    // Obter quantos meses representa cada ocorrência baseado na frequência
+    private function getMonthsPerOccurrence($frequencyType) {
+        switch ($frequencyType) {
+            case 'semanal':
+                return 0.25; // 1 semana = ~0.25 mês
+            case 'mensal':
+                return 1;
+            case 'bimestral':
+                return 2;
+            case 'trimestral':
+                return 3;
+            case 'semestral':
+                return 6;
+            case 'anual':
+                return 12;
+            default:
+                return 1; // padrão mensal
+        }
+    }
+
+    // Rotina principal para verificar e manter horizonte de geração
+    public function maintainRecurringHorizon($userId = null) {
+        $generated = 0;
+        $processed = 0;
+        
+        // Buscar todas as contas recorrentes ativas
+        $query = "SELECT a.id, a.user_id, rs.next_generation_date, rs.frequency_type, rs.end_date, rs.max_occurrences
+                  FROM accounts a 
+                  INNER JOIN recurring_settings rs ON a.id = rs.account_id 
+                  WHERE a.is_recurring = 1 AND rs.is_active = 1";
+        
+        if ($userId) {
+            $query .= " AND a.user_id = :user_id";
+        }
+        
+        $stmt = $this->conn->prepare($query);
+        if ($userId) {
+            $stmt->bindParam(':user_id', $userId);
+        }
+        $stmt->execute();
+        $recurringAccounts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        foreach ($recurringAccounts as $account) {
+            $processed++;
+            
+            // Verificar se precisa gerar mais instâncias
+            if ($this->needsMoreInstances($account['id'], $account)) {
+                $generatedForAccount = $this->generateRecurringInstancesAdvanced(
+                    $account['id'], 
+                    $account['user_id']
+                );
+                
+                if ($generatedForAccount !== false) {
+                    $generated += $generatedForAccount;
+                }
+            }
+        }
+        
+        return [
+            'processed' => $processed,
+            'generated' => $generated
+        ];
+    }
+
+    // Verificar se uma conta precisa de mais instâncias geradas
+    private function needsMoreInstances($accountId, $accountData) {
+        // Verificar qual é a data mais distante já gerada
+        $query = "SELECT MAX(due_date) as max_date FROM accounts 
+                  WHERE recurring_parent_id = :parent_id";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':parent_id', $accountId);
+        $stmt->execute();
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        $maxGeneratedDate = $result['max_date'];
+        
+        // Se não tem nenhuma instância gerada, precisa gerar
+        if (!$maxGeneratedDate) {
+            return true;
+        }
+        
+        // Calcular quantos meses à frente temos gerado
+        $now = new DateTime();
+        $maxDate = new DateTime($maxGeneratedDate);
+        $diff = $now->diff($maxDate);
+        $monthsAhead = ($diff->y * 12) + $diff->m;
+        
+        // Se tem menos de 60 meses à frente, precisa gerar mais
+        if ($monthsAhead < 60) {
+            return true;
+        }
+        
+        // Verificar se a conta tem limitações que podem ter sido atingidas
+        if ($accountData['end_date']) {
+            $endDate = new DateTime($accountData['end_date']);
+            // Se a data final é antes do nosso horizonte atual, não precisa gerar
+            if ($endDate <= $maxDate) {
+                return false;
+            }
+        }
+        
+        if ($accountData['max_occurrences']) {
+            // Contar quantas instâncias já foram geradas
+            $countQuery = "SELECT COUNT(*) as count FROM accounts 
+                          WHERE recurring_parent_id = :parent_id";
+            $countStmt = $this->conn->prepare($countQuery);
+            $countStmt->bindParam(':parent_id', $accountId);
+            $countStmt->execute();
+            $count = $countStmt->fetch(PDO::FETCH_ASSOC)['count'];
+            
+            // Se já atingiu o máximo, não precisa gerar
+            if ($count >= $accountData['max_occurrences']) {
+                return false;
+            }
+        }
+        
+        return false;
+    }
+
+    // Função para executar manutenção leve (chamada em page loads)
+    public function lightMaintenance($userId) {
+        // Verificar apenas algumas contas por vez para não sobrecarregar
+        $query = "SELECT a.id, a.user_id, rs.next_generation_date, rs.frequency_type, rs.end_date, rs.max_occurrences
+                  FROM accounts a 
+                  INNER JOIN recurring_settings rs ON a.id = rs.account_id 
+                  WHERE a.is_recurring = 1 AND rs.is_active = 1 AND a.user_id = :user_id
+                  ORDER BY rs.last_generated_date ASC 
+                  LIMIT 3"; // Processar apenas 3 contas por vez
+        
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':user_id', $userId);
+        $stmt->execute();
+        $accounts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        $generated = 0;
+        foreach ($accounts as $account) {
+            if ($this->needsMoreInstances($account['id'], $account)) {
+                $generatedForAccount = $this->generateRecurringInstancesAdvanced(
+                    $account['id'], 
+                    $account['user_id']
+                );
+                
+                if ($generatedForAccount !== false) {
+                    $generated += $generatedForAccount;
+                }
+            }
+        }
         
         return $generated;
     }
@@ -359,12 +635,11 @@ class RecurringSetting {
                   INNER JOIN recurring_settings rs ON a.id = rs.account_id
                   WHERE a.is_recurring = 1 
                     AND rs.is_active = 1
-                    AND (rs.next_generation_date IS NULL OR rs.next_generation_date <= :today)
-                    AND (rs.end_date IS NULL OR rs.end_date >= :today)";
+                    AND (rs.next_generation_date IS NULL OR rs.next_generation_date <= ?)
+                    AND (rs.end_date IS NULL OR rs.end_date >= ?)";
         
         $stmt = $this->conn->prepare($query);
-        $stmt->bindParam(':today', $today);
-        $stmt->execute();
+        $stmt->execute([$today, $today]);
         
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }

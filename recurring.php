@@ -18,6 +18,14 @@ $userId = $_SESSION['user_id'];
 $message = '';
 $messageType = '';
 
+// Executar manutenção leve das contas recorrentes (em background)
+try {
+    $recurringModel->lightMaintenance($userId);
+} catch (Exception $e) {
+    // Falha silenciosa - não deve interromper o carregamento da página
+    error_log("Erro na manutenção de recorrências: " . $e->getMessage());
+}
+
 // Processar ações
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $action = $_POST['action'] ?? '';
@@ -53,20 +61,38 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 
-// Buscar contas recorrentes
-$query = "SELECT a.*, c.name as category_name, rs.frequency_type, rs.frequency_interval, 
-                 rs.end_date, rs.max_occurrences, rs.next_generation_date, rs.is_active,
-                 (SELECT COUNT(*) FROM accounts child WHERE child.recurring_parent_id = a.id) as generated_count
-          FROM accounts a
-          INNER JOIN recurring_settings rs ON a.id = rs.account_id
-          LEFT JOIN categories c ON a.category_id = c.id
-          WHERE a.user_id = :user_id AND a.is_recurring = 1
-          ORDER BY a.created_at DESC";
+// Buscar contas recorrentes a pagar (despesas)
+$queryExpenses = "SELECT a.*, c.name as category_name, rs.frequency_type, rs.frequency_interval, 
+                         rs.end_date, rs.max_occurrences, rs.next_generation_date, rs.is_active,
+                         (SELECT COUNT(*) FROM accounts child WHERE child.recurring_parent_id = a.id) as generated_count
+                  FROM accounts a
+                  INNER JOIN recurring_settings rs ON a.id = rs.account_id
+                  LEFT JOIN categories c ON a.category_id = c.id
+                  WHERE a.user_id = :user_id AND a.is_recurring = 1 AND a.type = 'despesa'
+                  ORDER BY a.created_at DESC";
 
-$stmt = $recurringModel->getConnection()->prepare($query);
+$stmt = $recurringModel->getConnection()->prepare($queryExpenses);
 $stmt->bindParam(':user_id', $userId);
 $stmt->execute();
-$recurringAccounts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$recurringExpenses = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Buscar contas recorrentes a receber (receitas)
+$queryIncomes = "SELECT a.*, c.name as category_name, rs.frequency_type, rs.frequency_interval, 
+                        rs.end_date, rs.max_occurrences, rs.next_generation_date, rs.is_active,
+                        (SELECT COUNT(*) FROM accounts child WHERE child.recurring_parent_id = a.id) as generated_count
+                 FROM accounts a
+                 INNER JOIN recurring_settings rs ON a.id = rs.account_id
+                 LEFT JOIN categories c ON a.category_id = c.id
+                 WHERE a.user_id = :user_id AND a.is_recurring = 1 AND a.type = 'receita'
+                 ORDER BY a.created_at DESC";
+
+$stmt = $recurringModel->getConnection()->prepare($queryIncomes);
+$stmt->bindParam(':user_id', $userId);
+$stmt->execute();
+$recurringIncomes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Manter compatibilidade com código existente
+$recurringAccounts = array_merge($recurringExpenses, $recurringIncomes);
 
 // Buscar contas que precisam ser processadas
 $accountsNeedingGeneration = $recurringModel->getAccountsNeedingGeneration();
@@ -124,16 +150,28 @@ $needsProcessing = array_filter($accountsNeedingGeneration, function($account) u
             </div>
 
             <div class="p-6">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
                     <!-- Estatísticas -->
-                    <div class="bg-blue-50 rounded-lg p-4">
+                    <div class="bg-red-50 rounded-lg p-4">
                         <div class="flex items-center">
                             <div class="flex-shrink-0">
-                                <i class="fas fa-sync-alt text-blue-600 text-2xl"></i>
+                                <i class="fas fa-credit-card text-red-600 text-2xl"></i>
                             </div>
                             <div class="ml-4">
-                                <p class="text-sm font-medium text-blue-600">Total de Recorrências</p>
-                                <p class="text-2xl font-bold text-blue-900"><?= count($recurringAccounts) ?></p>
+                                <p class="text-sm font-medium text-red-600">Contas a Pagar</p>
+                                <p class="text-2xl font-bold text-red-900"><?= count($recurringExpenses) ?></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-green-50 rounded-lg p-4">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-money-bill-wave text-green-600 text-2xl"></i>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-green-600">Contas a Receber</p>
+                                <p class="text-2xl font-bold text-green-900"><?= count($recurringIncomes) ?></p>
                             </div>
                         </div>
                     </div>
@@ -144,20 +182,20 @@ $needsProcessing = array_filter($accountsNeedingGeneration, function($account) u
                                 <i class="fas fa-clock text-yellow-600 text-2xl"></i>
                             </div>
                             <div class="ml-4">
-                                <p class="text-sm font-medium text-yellow-600">Pendentes de Processamento</p>
+                                <p class="text-sm font-medium text-yellow-600">Pendentes</p>
                                 <p class="text-2xl font-bold text-yellow-900"><?= count($needsProcessing) ?></p>
                             </div>
                         </div>
                     </div>
 
-                    <div class="bg-green-50 rounded-lg p-4">
+                    <div class="bg-blue-50 rounded-lg p-4">
                         <div class="flex items-center">
                             <div class="flex-shrink-0">
-                                <i class="fas fa-check-circle text-green-600 text-2xl"></i>
+                                <i class="fas fa-check-circle text-blue-600 text-2xl"></i>
                             </div>
                             <div class="ml-4">
-                                <p class="text-sm font-medium text-green-600">Ativas</p>
-                                <p class="text-2xl font-bold text-green-900">
+                                <p class="text-sm font-medium text-blue-600">Ativas</p>
+                                <p class="text-2xl font-bold text-blue-900">
                                     <?= count(array_filter($recurringAccounts, function($acc) { return $acc['is_active']; })) ?>
                                 </p>
                             </div>
@@ -186,32 +224,32 @@ $needsProcessing = array_filter($accountsNeedingGeneration, function($account) u
             </div>
         </div>
 
-        <!-- Lista de Recorrências -->
-        <div class="bg-white rounded-lg shadow">
+        <!-- Contas Recorrentes a Pagar -->
+        <div class="bg-white rounded-lg shadow mb-6">
             <div class="p-6 border-b border-gray-200">
-                <h3 class="text-lg font-semibold text-gray-900">
-                    <i class="fas fa-list mr-2"></i>
-                    Contas Recorrentes
-                </h3>
+                <h2 class="text-xl font-semibold text-red-700">
+                    <i class="fas fa-credit-card mr-2"></i>
+                    Contas Recorrentes a Pagar
+                    <span class="text-sm font-normal text-gray-500 ml-2">(<?= count($recurringExpenses) ?> contas)</span>
+                </h2>
             </div>
 
-            <?php if (empty($recurringAccounts)): ?>
+            <?php if (empty($recurringExpenses)): ?>
             <div class="p-8 text-center">
-                <i class="fas fa-sync-alt text-gray-400 text-4xl mb-4"></i>
-                <h3 class="text-lg font-medium text-gray-900 mb-2">Nenhuma recorrência configurada</h3>
-                <p class="text-gray-600 mb-4">Configure contas recorrentes para automatizar seu controle financeiro.</p>
-                <a href="accounts.php?recurring=1" 
-                   class="bg-primary hover:bg-blue-700 text-white px-6 py-2 rounded-md transition-colors">
+                <i class="fas fa-credit-card text-gray-400 text-4xl mb-4"></i>
+                <h3 class="text-lg font-medium text-gray-900 mb-2">Nenhuma conta recorrente a pagar</h3>
+                <p class="text-gray-600 mb-4">Configure contas recorrentes de despesas para automatizar seu controle.</p>
+                <a href="accounts.php?recurring=1&type=expense" 
+                   class="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-md transition-colors">
                     <i class="fas fa-plus mr-2"></i>
-                    Criar Primeira Recorrência
+                    Criar Conta a Pagar
                 </a>
             </div>
             <?php else: ?>
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
+                    <thead class="bg-red-50">
                         <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Conta</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Frequência</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Próxima Geração</th>
@@ -221,19 +259,149 @@ $needsProcessing = array_filter($accountsNeedingGeneration, function($account) u
                         </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
-                        <?php foreach ($recurringAccounts as $account): ?>
+                        <?php foreach ($recurringExpenses as $account): ?>
                         <tr class="hover:bg-gray-50">
-                            <td class="px-6 py-4 text-center">
-                                <span class="text-lg font-bold <?= $account['type'] == 'receita' ? 'text-green-600' : 'text-red-600' ?>">
-                                    <?= $account['type'] == 'receita' ? '+' : '-' ?>
-                                </span>
-                            </td>
                             <td class="px-6 py-4">
                                 <div>
                                     <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($account['description']) ?></div>
                                     <div class="text-sm text-gray-500">
                                         <?= htmlspecialchars($account['category_name']) ?> • 
-                                        <span class="<?= $account['type'] == 'receita' ? 'text-green-600' : 'text-red-600' ?>">
+                                        <span class="text-red-600">
+                                            <?= formatCurrency($account['amount']) ?>
+                                        </span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-900">
+                                <?php
+                                $frequency = '';
+                                switch ($account['frequency_type']) {
+                                    case 'semanal':
+                                        $frequency = "Semanal";
+                                        break;
+                                    case 'mensal':
+                                        $frequency = "Mensal";
+                                        break;
+                                    case 'bimestral':
+                                        $frequency = "Bimestral";
+                                        break;
+                                    case 'trimestral':
+                                        $frequency = "Trimestral";
+                                        break;
+                                    case 'semestral':
+                                        $frequency = "Semestral";
+                                        break;
+                                    case 'anual':
+                                        $frequency = "Anual";
+                                        break;
+                                    case 'personalizado':
+                                        $frequency = "Personalizado ({$account['frequency_interval']} dias)";
+                                        break;
+                                    default:
+                                        $frequency = 'Não definida';
+                                        break;
+                                }
+                                echo $frequency;
+                                ?>
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-900">
+                                <?= $account['next_generation_date'] ? formatDate($account['next_generation_date']) : 'Não definida' ?>
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-900">
+                                <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
+                                    <?= $account['generated_count'] ?>
+                                </span>
+                            </td>
+                            <td class="px-6 py-4">
+                                <?php if ($account['is_active']): ?>
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                    <i class="fas fa-check-circle mr-1"></i>
+                                    Ativa
+                                </span>
+                                <?php else: ?>
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                    <i class="fas fa-pause-circle mr-1"></i>
+                                    Inativa
+                                </span>
+                                <?php endif; ?>
+                            </td>
+                            <td class="px-6 py-4 text-sm font-medium">
+                                <div class="flex space-x-2">
+                                    <button onclick="openEditModal(<?= $account['id'] ?>)" 
+                                       class="text-blue-600 hover:text-blue-900">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    
+                                    <?php if ($account['is_active']): ?>
+                                    <form method="POST" class="inline" onsubmit="return confirm('Desativar esta recorrência?')">
+                                        <input type="hidden" name="action" value="deactivate">
+                                        <input type="hidden" name="account_id" value="<?= $account['id'] ?>">
+                                        <button type="submit" class="text-yellow-600 hover:text-yellow-900">
+                                            <i class="fas fa-pause"></i>
+                                        </button>
+                                    </form>
+                                    <?php else: ?>
+                                    <form method="POST" class="inline">
+                                        <input type="hidden" name="action" value="activate">
+                                        <input type="hidden" name="account_id" value="<?= $account['id'] ?>">
+                                        <button type="submit" class="text-green-600 hover:text-green-900">
+                                            <i class="fas fa-play"></i>
+                                        </button>
+                                    </form>
+                                    <?php endif; ?>
+                                </div>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php endif; ?>
+        </div>
+
+        <!-- Contas Recorrentes a Receber -->
+        <div class="bg-white rounded-lg shadow mb-6">
+            <div class="p-6 border-b border-gray-200">
+                <h2 class="text-xl font-semibold text-green-700">
+                    <i class="fas fa-money-bill-wave mr-2"></i>
+                    Contas Recorrentes a Receber
+                    <span class="text-sm font-normal text-gray-500 ml-2">(<?= count($recurringIncomes) ?> contas)</span>
+                </h2>
+            </div>
+
+            <?php if (empty($recurringIncomes)): ?>
+            <div class="p-8 text-center">
+                <i class="fas fa-money-bill-wave text-gray-400 text-4xl mb-4"></i>
+                <h3 class="text-lg font-medium text-gray-900 mb-2">Nenhuma conta recorrente a receber</h3>
+                <p class="text-gray-600 mb-4">Configure contas recorrentes de receitas para automatizar seu controle.</p>
+                <a href="accounts.php?recurring=1&type=income" 
+                   class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-md transition-colors">
+                    <i class="fas fa-plus mr-2"></i>
+                    Criar Conta a Receber
+                </a>
+            </div>
+            <?php else: ?>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-green-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Conta</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Frequência</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Próxima Geração</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Geradas</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <?php foreach ($recurringIncomes as $account): ?>
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4">
+                                <div>
+                                    <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($account['description']) ?></div>
+                                    <div class="text-sm text-gray-500">
+                                        <?= htmlspecialchars($account['category_name']) ?> • 
+                                        <span class="text-green-600">
                                             <?= formatCurrency($account['amount']) ?>
                                         </span>
                                     </div>

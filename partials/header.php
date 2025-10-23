@@ -9,14 +9,14 @@ function render_header($active) {
     <header class="bg-white shadow-sm border-b">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-16">
-                <div class="flex items-center">
-                    <h1 class="text-xl font-bold text-gray-900">
+                <div class="flex items-center flex-shrink-0 min-w-0">
+                    <h1 class="text-xl font-bold text-gray-900 whitespace-nowrap">
                         <i class="fas fa-chart-line text-primary mr-2"></i>
                         <?= APP_NAME ?>
                     </h1>
                 </div>
                 
-                <div class="flex items-center justify-between w-full">
+                <div class="flex items-center justify-between flex-1 ml-8">
                     <nav class="flex space-x-4">
                     <?php foreach ($items as $key => $item): ?>
                         <?php 
@@ -80,6 +80,12 @@ function render_header($active) {
                                     <i class="fas fa-user-cog mr-2"></i>
                                     Perfil
                                 </a>
+                                <?php if (isset($_SESSION['user_email']) && $_SESSION['user_email'] === 'hello@crisweiser.com'): ?>
+                                    <a href="admin.php" class="block px-3 py-2 rounded text-gray-700 hover:bg-gray-100">
+                                        <i class="fas fa-shield-alt mr-2"></i>
+                                        Admin
+                                    </a>
+                                <?php endif; ?>
                                 <hr class="my-1 border-gray-200">
                                 <a href="logout.php" class="block px-3 py-2 rounded text-red-600 hover:bg-red-50">
                                     <i class="fas fa-sign-out-alt mr-2"></i>

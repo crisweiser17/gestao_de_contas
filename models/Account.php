@@ -235,8 +235,52 @@ class Account {
         return $stmt->execute();
     }
 
-    // Buscar contas com filtros
-    public function getWithFilters($userId, $filters = [], $sortBy = 'due_date', $sortOrder = 'DESC') {
+    // Contar registros com filtros
+    public function countWithFilters($userId, $filters = []) {
+        $query = "SELECT COUNT(*) as total 
+                  FROM " . $this->table_name . " a
+                  WHERE a.user_id = :user_id";
+        
+        $params = [':user_id' => $userId];
+        
+        if (!empty($filters['category_id'])) {
+            $query .= " AND a.category_id = :category_id";
+            $params[':category_id'] = $filters['category_id'];
+        }
+        
+        if (!empty($filters['type'])) {
+            $query .= " AND a.type = :type";
+            $params[':type'] = $filters['type'];
+        }
+        
+        if (!empty($filters['status'])) {
+            $query .= " AND a.status = :status";
+            $params[':status'] = $filters['status'];
+        }
+        
+        if (!empty($filters['date_from'])) {
+            $query .= " AND a.due_date >= :date_from";
+            $params[':date_from'] = $filters['date_from'];
+        }
+        
+        if (!empty($filters['date_to'])) {
+            $query .= " AND a.due_date <= :date_to";
+            $params[':date_to'] = $filters['date_to'];
+        }
+        
+        $stmt = $this->conn->prepare($query);
+        
+        foreach ($params as $key => $value) {
+            $stmt->bindValue($key, $value);
+        }
+        
+        $stmt->execute();
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $result['total'] ?? 0;
+    }
+
+    // Buscar contas com filtros e paginação
+    public function getWithFilters($userId, $filters = [], $sortBy = 'due_date', $sortOrder = 'DESC', $limit = null, $offset = 0) {
         $query = "SELECT a.*, c.name as category_name 
                   FROM " . $this->table_name . " a
                   LEFT JOIN categories c ON a.category_id = c.id
@@ -290,6 +334,66 @@ class Account {
         
         $query .= " " . $sortOrder;
         
+        // Adicionar paginação se especificada
+        if ($limit !== null) {
+            $query .= " LIMIT :limit OFFSET :offset";
+            $params[':limit'] = $limit;
+            $params[':offset'] = $offset;
+        }
+        
+        $stmt = $this->conn->prepare($query);
+        
+        foreach ($params as $key => $value) {
+            if ($key === ':limit' || $key === ':offset') {
+                $stmt->bindValue($key, $value, PDO::PARAM_INT);
+            } else {
+                $stmt->bindValue($key, $value);
+            }
+        }
+        
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    // Calcular soma total dos valores com filtros aplicados
+    public function sumWithFilters($userId, $filters = []) {
+        $query = "SELECT SUM(a.amount) as total
+                  FROM accounts a 
+                  LEFT JOIN categories c ON a.category_id = c.id 
+                  WHERE a.user_id = :user_id";
+        
+        $params = [':user_id' => $userId];
+        
+        if (!empty($filters['type'])) {
+            $query .= " AND a.type = :type";
+            $params[':type'] = $filters['type'];
+        }
+        
+        if (!empty($filters['category_id'])) {
+            $query .= " AND a.category_id = :category_id";
+            $params[':category_id'] = $filters['category_id'];
+        }
+        
+        if (!empty($filters['search'])) {
+            $query .= " AND (a.description LIKE :search OR c.name LIKE :search)";
+            $params[':search'] = '%' . $filters['search'] . '%';
+        }
+        
+        if (!empty($filters['status'])) {
+            $query .= " AND a.status = :status";
+            $params[':status'] = $filters['status'];
+        }
+        
+        if (!empty($filters['date_from'])) {
+            $query .= " AND a.due_date >= :date_from";
+            $params[':date_from'] = $filters['date_from'];
+        }
+        
+        if (!empty($filters['date_to'])) {
+            $query .= " AND a.due_date <= :date_to";
+            $params[':date_to'] = $filters['date_to'];
+        }
+        
         $stmt = $this->conn->prepare($query);
         
         foreach ($params as $key => $value) {
@@ -297,7 +401,9 @@ class Account {
         }
         
         $stmt->execute();
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        return $result['total'] ?? 0;
     }
 
     // Limpar contas antigas (para manutenção do banco)

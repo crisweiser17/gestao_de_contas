@@ -8,11 +8,21 @@ if (!isLoggedIn()) {
 
 require_once 'models/Account.php';
 require_once 'models/Category.php';
+require_once 'models/RecurringSetting.php';
 
 $accountModel = new Account($pdo);
 $categoryModel = new Category($pdo);
+$recurringModel = new RecurringSetting();
 
 $userId = $_SESSION['user_id'];
+
+// Executar manutenção leve das contas recorrentes (em background)
+try {
+    $recurringModel->lightMaintenance($userId);
+} catch (Exception $e) {
+    // Falha silenciosa - não deve interromper o carregamento da página
+    error_log("Erro na manutenção de recorrências: " . $e->getMessage());
+}
 
 // Ações rápidas (marcar como paga/recebida) diretamente do dashboard
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -383,7 +393,7 @@ $recentTransactions = $accountModel->getRecentTransactions($userId, 10);
                                             <?php 
                                             $fileExtension = strtolower(pathinfo($transaction['attachment'], PATHINFO_EXTENSION));
                                             ?>
-                                            <a href="<?= htmlspecialchars($transaction['attachment']) ?>" target="_blank" 
+                                            <a href="javascript:void(0)" onclick="openLightbox('<?= htmlspecialchars($transaction['attachment']) ?>')" 
                                                class="inline-flex items-center text-blue-600 hover:text-blue-800 text-xs" title="Ver comprovante">
                                                 <?php if ($fileExtension === 'pdf'): ?>
                                                     <i class="fas fa-file-pdf text-red-500"></i>
@@ -425,7 +435,107 @@ $recentTransactions = $accountModel->getRecentTransactions($userId, 10);
         </div>
     </main>
 
+    <!-- Lightbox Modal -->
+    <div id="lightbox" class="fixed inset-0 bg-black bg-opacity-75 hidden z-50 flex items-center justify-center">
+        <div class="relative max-w-4xl max-h-full w-full h-full flex items-center justify-center p-4">
+            <!-- Botão de fechar -->
+            <button onclick="closeLightbox()" class="absolute top-4 right-4 text-white hover:text-gray-300 z-10">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+            
+            <!-- Conteúdo do lightbox -->
+            <div id="lightbox-content" class="w-full h-full flex items-center justify-center">
+                <!-- Conteúdo será inserido dinamicamente -->
+            </div>
+        </div>
+    </div>
+
+    <style>
+        #lightbox {
+            backdrop-filter: blur(4px);
+        }
+        
+        #lightbox iframe {
+            max-width: 90vw;
+            max-height: 90vh;
+            width: 100%;
+            height: 100%;
+            border: none;
+            border-radius: 8px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+        
+        #lightbox img {
+            max-width: 90vw;
+            max-height: 90vh;
+            object-fit: contain;
+            border-radius: 8px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+        
+        .lightbox-loading {
+            color: white;
+            font-size: 18px;
+            text-align: center;
+        }
+    </style>
+
     <script>
+        // Funções do Lightbox
+        function openLightbox(filePath) {
+            const lightbox = document.getElementById('lightbox');
+            const content = document.getElementById('lightbox-content');
+            
+            // Mostrar loading
+            content.innerHTML = '<div class="lightbox-loading">Carregando...</div>';
+            lightbox.classList.remove('hidden');
+            
+            // Detectar tipo de arquivo
+            const fileExtension = filePath.split('.').pop().toLowerCase();
+            const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'];
+            const pdfExtensions = ['pdf'];
+            
+            if (imageExtensions.includes(fileExtension)) {
+                // Exibir imagem
+                content.innerHTML = `<img src="${filePath}" alt="Comprovante" onload="this.style.opacity=1" style="opacity:0; transition: opacity 0.3s;">`;
+            } else if (pdfExtensions.includes(fileExtension)) {
+                // Exibir PDF em iframe
+                content.innerHTML = `<iframe src="${filePath}" onload="this.style.opacity=1" style="opacity:0; transition: opacity 0.3s;"></iframe>`;
+            } else {
+                // Outros tipos de arquivo - tentar iframe
+                content.innerHTML = `<iframe src="${filePath}" onload="this.style.opacity=1" style="opacity:0; transition: opacity 0.3s;"></iframe>`;
+            }
+        }
+        
+        function closeLightbox() {
+            const lightbox = document.getElementById('lightbox');
+            lightbox.classList.add('hidden');
+            
+            // Limpar conteúdo após animação
+            setTimeout(() => {
+                document.getElementById('lightbox-content').innerHTML = '';
+            }, 300);
+        }
+        
+        // Fechar lightbox ao clicar fora do conteúdo
+        document.addEventListener('DOMContentLoaded', function() {
+            const lightbox = document.getElementById('lightbox');
+            lightbox.addEventListener('click', function(e) {
+                if (e.target === lightbox) {
+                    closeLightbox();
+                }
+            });
+            
+            // Fechar com ESC
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape' && !lightbox.classList.contains('hidden')) {
+                    closeLightbox();
+                }
+            });
+        });
+
         // Função para filtrar contas da seção "Vencendo em 7 dias"
         function filterWeekAccounts(type) {
             const accounts = document.querySelectorAll('.week-account');
