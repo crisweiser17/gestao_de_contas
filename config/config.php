@@ -3,15 +3,32 @@
  * CONFIGURAÇÃO PRINCIPAL - SISTEMA DE AMBIENTE
  * 
  * 🎯 CONTROLE DE AMBIENTE:
- * Mude apenas a variável $environment abaixo:
+ * 1. Via URL: index.php?setvar=PROD ou index.php?setvar=STAGE
+ * 2. Via variável: Mude $environment abaixo
  * - 'PROD' = Produção (Cloudways)
  * - 'STAGE' = Desenvolvimento Local
  */
 
 // ============================================
-// 🚀 CONTROLE DE AMBIENTE - MUDE AQUI!
+// 🚀 CONTROLE DE AMBIENTE DINÂMICO
 // ============================================
-$environment = 'STAGE'; // Mude para 'PROD' para produção
+
+// Detecta parâmetro setvar na URL para alternar ambiente
+if (isset($_GET['setvar'])) {
+    $requested_env = strtoupper($_GET['setvar']);
+    if (in_array($requested_env, ['PROD', 'STAGE'])) {
+        $environment = $requested_env;
+        
+        // Feedback visual da mudança
+        echo "<div style='background: #4CAF50; color: white; padding: 10px; text-align: center; font-family: Arial;'>";
+        echo "🔄 <strong>Ambiente alterado para: " . $environment . "</strong>";
+        echo "<br>📊 Credenciais do banco: " . ($environment === 'PROD' ? 'Cloudways (juwvrjmpxq)' : 'Local (root@localhost)');
+        echo "</div>";
+    }
+} else {
+    // Ambiente padrão quando não há parâmetro
+    $environment = 'STAGE'; // Mude para 'PROD' para produção padrão
+}
 
 // ============================================
 // 📊 CONFIGURAÇÕES POR AMBIENTE
