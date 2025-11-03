@@ -12,7 +12,8 @@ try {
         'Contabilidade', 'AMX', 'Consórcios', 'Condomínio', 'Aluguel', 
         'Seguro', 'Internet', 'Telefone', 'Energia', 'Água', 'Gás',
         'Netflix', 'Spotify', 'Amazon', 'Mensalidade', 'Assinatura',
-        'Plano', 'Saúde', 'Odontológico', 'Sulamerica'
+        'Plano', 'Saúde', 'Odontológico', 'Sulamerica', 'HS Consorcios',
+        'Conj. dos Passaros', 'QG Cardoso', 'Salario NAVA', 'NAVA'
     ];
     
     echo "<h3>📋 Palavras-chave utilizadas:</h3>";
