@@ -263,7 +263,10 @@ $needsProcessing = array_filter($accountsNeedingGeneration, function($account) u
                         <tr class="hover:bg-gray-50">
                             <td class="px-6 py-4">
                                 <div>
-                                    <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($account['description']) ?></div>
+                                    <div class="text-sm font-medium text-gray-900">
+                                        <i class="fas fa-sync-alt text-blue-500 mr-2" title="Conta Recorrente"></i>
+                                        <?= htmlspecialchars($account['description']) ?>
+                                    </div>
                                     <div class="text-sm text-gray-500">
                                         <?= htmlspecialchars($account['category_name']) ?> • 
                                         <span class="text-red-600">
@@ -398,7 +401,10 @@ $needsProcessing = array_filter($accountsNeedingGeneration, function($account) u
                         <tr class="hover:bg-gray-50">
                             <td class="px-6 py-4">
                                 <div>
-                                    <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($account['description']) ?></div>
+                                    <div class="text-sm font-medium text-gray-900">
+                                        <i class="fas fa-sync-alt text-blue-500 mr-2" title="Conta Recorrente"></i>
+                                        <?= htmlspecialchars($account['description']) ?>
+                                    </div>
                                     <div class="text-sm text-gray-500">
                                         <?= htmlspecialchars($account['category_name']) ?> • 
                                         <span class="text-green-600">
