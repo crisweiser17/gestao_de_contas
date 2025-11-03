@@ -55,7 +55,7 @@ class Account {
 
     // Buscar contas vencidas
     public function getOverdueAccounts($userId) {
-        $query = "SELECT a.*, c.name as category_name 
+        $query = "SELECT a.*, c.name as category_name, a.is_recurring
                   FROM " . $this->table_name . " a
                   LEFT JOIN categories c ON a.category_id = c.id
                   WHERE a.user_id = :user_id 
@@ -72,7 +72,7 @@ class Account {
 
     // Buscar contas vencendo nos próximos X dias
     public function getUpcomingAccounts($userId, $days) {
-        $query = "SELECT a.*, c.name as category_name 
+        $query = "SELECT a.*, c.name as category_name, a.is_recurring
                   FROM " . $this->table_name . " a
                   LEFT JOIN categories c ON a.category_id = c.id
                   WHERE a.user_id = :user_id 
@@ -90,7 +90,7 @@ class Account {
 
     // Buscar contas vencendo do 8º dia até o fim do mês atual
     public function getUpcomingAccountsRestOfMonth($userId) {
-        $query = "SELECT a.*, c.name as category_name 
+        $query = "SELECT a.*, c.name as category_name, a.is_recurring
                   FROM " . $this->table_name . " a
                   LEFT JOIN categories c ON a.category_id = c.id
                   WHERE a.user_id = :user_id 
@@ -123,7 +123,7 @@ class Account {
 
     // Buscar transações recentes
     public function getRecentTransactions($userId, $limit = 10) {
-        $query = "SELECT a.*, c.name as category_name 
+        $query = "SELECT a.*, c.name as category_name, a.is_recurring
                   FROM " . $this->table_name . " a
                   LEFT JOIN categories c ON a.category_id = c.id
                   WHERE a.user_id = :user_id 
@@ -168,7 +168,7 @@ class Account {
 
     // Buscar conta por ID
     public function getById($id, $userId) {
-        $query = "SELECT a.*, c.name as category_name 
+        $query = "SELECT a.*, c.name as category_name, a.is_recurring
                   FROM " . $this->table_name . " a
                   LEFT JOIN categories c ON a.category_id = c.id
                   WHERE a.id = :id AND a.user_id = :user_id";
@@ -281,7 +281,7 @@ class Account {
 
     // Buscar contas com filtros e paginação
     public function getWithFilters($userId, $filters = [], $sortBy = 'due_date', $sortOrder = 'DESC', $limit = null, $offset = 0) {
-        $query = "SELECT a.*, c.name as category_name 
+        $query = "SELECT a.*, c.name as category_name, a.is_recurring
                   FROM " . $this->table_name . " a
                   LEFT JOIN categories c ON a.category_id = c.id
                   WHERE a.user_id = :user_id";
