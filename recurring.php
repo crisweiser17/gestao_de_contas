@@ -547,10 +547,7 @@ $needsProcessing = array_filter($accountsNeedingGeneration, function($account) u
 
     <script>
         function openEditModal(accountId) {
-            document.getElementById('editModal').classList.remove('hidden');
-            document.getElementById('ok-btn').onclick = function() {
-                window.location.href = 'accounts.php?edit=' + accountId;
-            };
+            window.location.href = 'accounts.php?action=edit&id=' + accountId;
         }
 
         function closeEditModal() {
