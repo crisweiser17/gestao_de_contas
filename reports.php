@@ -15,13 +15,48 @@ $categoryModel = new Category($pdo);
 $userId = $_SESSION['user_id'];
 $action = $_GET['action'] ?? 'view';
 
-// Filtros padrão
+// Filtros de data: suporte a Mês/Ano e Custom
+$dateFilterType = $_GET['date_filter_type'] ?? '';
+$dateMonth = isset($_GET['date_month']) ? (int)$_GET['date_month'] : (int)date('n');
+$dateYear = isset($_GET['date_year']) ? (int)$_GET['date_year'] : (int)date('Y');
+$dateFromInput = $_GET['date_from'] ?? '';
+$dateToInput = $_GET['date_to'] ?? '';
+
+// Inferir tipo quando apenas date_from/date_to vierem
+if (empty($dateFilterType)) {
+    if (!empty($dateFromInput) || !empty($dateToInput)) {
+        $dateFilterType = 'custom';
+    } else {
+        $dateFilterType = 'month_year';
+    }
+}
+
+// Filtros padrão + processamento de data
 $filters = [
-    'date_from' => $_GET['date_from'] ?? date('Y-m-01'), // Primeiro dia do mês atual
-    'date_to' => $_GET['date_to'] ?? date('Y-m-t'), // Último dia do mês atual
     'category_id' => $_GET['category_id'] ?? '',
     'type' => $_GET['type'] ?? '',
     'status' => $_GET['status'] ?? ''
+];
+
+if ($dateFilterType === 'month_year') {
+    $computedFrom = sprintf('%04d-%02d-01', $dateYear, $dateMonth);
+    $filters['date_from'] = $computedFrom;
+    $filters['date_to'] = date('Y-m-t', strtotime($computedFrom));
+} else { // custom
+    $filters['date_from'] = $dateFromInput ?: date('Y-m-01');
+    $filters['date_to'] = $dateToInput ?: date('Y-m-t');
+}
+
+// Parâmetros para reconstruir links (export, submit)
+$queryFilters = [
+    'date_filter_type' => $dateFilterType,
+    'date_month' => $dateMonth,
+    'date_year' => $dateYear,
+    'date_from' => $filters['date_from'],
+    'date_to' => $filters['date_to'],
+    'category_id' => $filters['category_id'],
+    'type' => $filters['type'],
+    'status' => $filters['status']
 ];
 
 // Buscar dados
@@ -272,24 +307,52 @@ if ($action == 'export_pdf') {
 
             <form method="GET" class="p-6">
                 <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+                    <!-- Filtro de Data -->
                     <div>
-                        <label for="date_from" class="block text-sm font-medium text-gray-700 mb-2">
-                            Data Inicial
-                        </label>
-                        <input type="date" id="date_from" name="date_from" 
-                               value="<?= $filters['date_from'] ?>"
-                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Filtro de Data</label>
+                        <select name="date_filter_type" id="reportDateFilterType"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                                onchange="toggleReportDateFilters()">
+                            <option value="month_year" <?= $dateFilterType === 'month_year' ? 'selected' : '' ?>>Mês/Ano</option>
+                            <option value="custom" <?= $dateFilterType === 'custom' ? 'selected' : '' ?>>Customizado</option>
+                        </select>
                     </div>
 
-                    <div>
-                        <label for="date_to" class="block text-sm font-medium text-gray-700 mb-2">
-                            Data Final
-                        </label>
-                        <input type="date" id="date_to" name="date_to" 
-                               value="<?= $filters['date_to'] ?>"
-                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                    <!-- Mês/Ano -->
+                    <div id="reportMonthYearFilter" style="display: <?= $dateFilterType === 'month_year' ? 'block' : 'none' ?>">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Mês/Ano</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <select name="date_month"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                                <option value="">Mês</option>
+                                <?php for ($m = 1; $m <= 12; $m++): ?>
+                                <option value="<?= $m ?>" <?= $dateMonth == $m ? 'selected' : '' ?>>
+                                    <?= date('M', mktime(0, 0, 0, $m, 1)) ?>
+                                </option>
+                                <?php endfor; ?>
+                            </select>
+                            <select name="date_year"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                                <option value="">Ano</option>
+                                <?php for ($y = 2025; $y <= date('Y') + 5; $y++): ?>
+                                <option value="<?= $y ?>" <?= $dateYear == $y ? 'selected' : '' ?>><?= $y ?></option>
+                                <?php endfor; ?>
+                            </select>
+                        </div>
                     </div>
 
+                    <!-- Customizado -->
+                    <div id="reportCustomFilter" style="display: <?= $dateFilterType === 'custom' ? 'block' : 'none' ?>">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Período</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <input type="date" name="date_from" value="<?= htmlspecialchars($filters['date_from']) ?>"
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                            <input type="date" name="date_to" value="<?= htmlspecialchars($filters['date_to']) ?>"
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                        </div>
+                    </div>
+
+                    <!-- Categoria -->
                     <div>
                         <label for="category_id" class="block text-sm font-medium text-gray-700 mb-2">
                             Categoria
@@ -305,6 +368,7 @@ if ($action == 'export_pdf') {
                         </select>
                     </div>
 
+                    <!-- Tipo -->
                     <div>
                         <label for="type" class="block text-sm font-medium text-gray-700 mb-2">
                             Tipo
@@ -317,6 +381,7 @@ if ($action == 'export_pdf') {
                         </select>
                     </div>
 
+                    <!-- Status -->
                     <div>
                         <label for="status" class="block text-sm font-medium text-gray-700 mb-2">
                             Status
@@ -338,12 +403,12 @@ if ($action == 'export_pdf') {
                     </button>
 
                     <div class="flex space-x-2">
-                        <a href="?action=export_csv&<?= http_build_query($filters) ?>" 
+                        <a href="?action=export_csv&<?= http_build_query($queryFilters) ?>" 
                            class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md transition-colors">
                             <i class="fas fa-file-csv mr-2"></i>
                             Exportar CSV
                         </a>
-                        <a href="?action=export_pdf&<?= http_build_query($filters) ?>" 
+                        <a href="?action=export_pdf&<?= http_build_query($queryFilters) ?>" 
                            target="_blank"
                            class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md transition-colors">
                             <i class="fas fa-file-pdf mr-2"></i>
@@ -558,6 +623,24 @@ if ($action == 'export_pdf') {
     </main>
 
     <script>
+        function toggleReportDateFilters() {
+            const type = document.getElementById('reportDateFilterType').value;
+            const monthYear = document.getElementById('reportMonthYearFilter');
+            const custom = document.getElementById('reportCustomFilter');
+            monthYear.style.display = 'none';
+            custom.style.display = 'none';
+            if (type === 'month_year') {
+                monthYear.style.display = 'block';
+            } else if (type === 'custom') {
+                custom.style.display = 'block';
+            }
+        }
+
+        // Inicializar ao carregar
+        document.addEventListener('DOMContentLoaded', function() {
+            toggleReportDateFilters();
+        });
+
         // Dados para gráfico por categoria
         const categoryData = {
             labels: [
