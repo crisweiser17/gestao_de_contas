@@ -619,7 +619,7 @@ if ($action == 'list') {
                         <tr class="hover:bg-gray-50">
                             <td class="px-6 py-4">
                                 <div class="flex items-center">
-                                    <?php if ($account['is_recurring']): ?>
+                                    <?php if (!empty($account['is_recurring']) || !empty($account['recurring_parent_id'])): ?>
                                     <i class="fas fa-sync-alt text-blue-500 mr-2" title="Conta recorrente"></i>
                                     <?php endif; ?>
                                     <div>
@@ -822,7 +822,7 @@ if ($action == 'list') {
                         <tr class="hover:bg-gray-50">
                             <td class="px-6 py-4">
                                 <div class="flex items-center">
-                                    <?php if ($account['is_recurring']): ?>
+                                    <?php if (!empty($account['is_recurring']) || !empty($account['recurring_parent_id'])): ?>
                                     <i class="fas fa-sync-alt text-blue-500 mr-2" title="Conta recorrente"></i>
                                     <?php endif; ?>
                                     <div>
