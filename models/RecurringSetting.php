@@ -565,7 +565,7 @@ class RecurringSetting {
     public function generateProjections($userId, $days) {
         $startDate = date('Y-m-d');
         $endDate = date('Y-m-d', strtotime("+{$days} days"));
-        
+
         // Buscar contas recorrentes ativas
         $query = "SELECT a.*, c.name as category_name, rs.frequency_type, rs.frequency_interval, 
                          rs.end_date, rs.max_occurrences, rs.next_generation_date
@@ -576,53 +576,65 @@ class RecurringSetting {
                     AND a.is_recurring = 1 
                     AND rs.is_active = 1
                     AND (rs.end_date IS NULL OR rs.end_date >= :start_date)";
-        
+
         $stmt = $this->conn->prepare($query);
         $stmt->bindParam(':user_id', $userId);
         $stmt->bindParam(':start_date', $startDate);
         $stmt->execute();
-        
+
         $recurringAccounts = $stmt->fetchAll(PDO::FETCH_ASSOC);
         $projections = [];
-        
+
         foreach ($recurringAccounts as $account) {
             $currentDate = max($startDate, $account['next_generation_date'] ?? $account['due_date']);
             $occurrenceCount = 0;
-            
+
             while ($currentDate <= $endDate) {
                 // Verificar se ainda pode gerar (limite de ocorrências)
                 if ($account['max_occurrences'] && $occurrenceCount >= $account['max_occurrences']) {
                     break;
                 }
-                
+
                 // Verificar se não passou da data final
                 if ($account['end_date'] && $currentDate > $account['end_date']) {
                     break;
                 }
-                
-                // Adicionar projeção
-                $projections[] = [
-                    'id' => 'proj_' . $account['id'] . '_' . $currentDate,
-                    'user_id' => $userId,
-                    'category_id' => $account['category_id'],
-                    'category_name' => $account['category_name'],
-                    'description' => $account['description'] . ' (Projetado)',
-                    'amount' => $account['amount'],
-                    'due_date' => $currentDate,
-                    'type' => $account['type'],
-                    'status' => 'pendente',
-                    'url' => $account['url'],
-                    'is_recurring' => true,
-                    'is_projection' => true,
-                    'parent_id' => $account['id']
-                ];
-                
-                // Calcular próxima data (usando a data original da conta como referência)
+
+                // Deduplicar: pular projeção se já existe ocorrência real para esta data
+                $existsQuery = "SELECT COUNT(*) as count FROM accounts 
+                                WHERE user_id = :user_id AND recurring_parent_id = :parent_id AND due_date = :due_date";
+                $existsStmt = $this->conn->prepare($existsQuery);
+                $existsStmt->bindParam(':user_id', $userId);
+                $existsStmt->bindParam(':parent_id', $account['id']);
+                $existsStmt->bindParam(':due_date', $currentDate);
+                $existsStmt->execute();
+                $exists = $existsStmt->fetch(PDO::FETCH_ASSOC);
+
+                if (($exists['count'] ?? 0) == 0) {
+                    // Adicionar projeção
+                    $projections[] = [
+                        'id' => 'proj_' . $account['id'] . '_' . $currentDate,
+                        'user_id' => $userId,
+                        'category_id' => $account['category_id'],
+                        'category_name' => $account['category_name'],
+                        'description' => $account['description'] . ' (Projetado)',
+                        'amount' => $account['amount'],
+                        'due_date' => $currentDate,
+                        'type' => $account['type'],
+                        'status' => 'pendente',
+                        'url' => $account['url'],
+                        'is_recurring' => true,
+                        'is_projection' => true,
+                        'parent_id' => $account['id']
+                    ];
+                }
+
+                // Próxima data e incremento
                 $currentDate = $this->calculateNextDate($currentDate, $account['frequency_type'], $account['frequency_interval'], $account['due_date']);
                 $occurrenceCount++;
             }
         }
-        
+
         return $projections;
     }
 

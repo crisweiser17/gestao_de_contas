@@ -282,6 +282,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     ];
 }
 
+// Definir filtro padrão para Mês/Ano do mês/ano atual quando nenhum filtro for informado
+if (empty($filters['date_filter_type'])) {
+    $filters['date_filter_type'] = 'month_year';
+    $filters['date_month'] = date('n');
+    $filters['date_year'] = date('Y');
+}
+
 // Processar filtros de data baseado no tipo selecionado
 if (!empty($filters['date_filter_type'])) {
     switch ($filters['date_filter_type']) {
@@ -300,7 +307,42 @@ if (!empty($filters['date_filter_type'])) {
         case 'custom':
             // Manter os valores de date_from e date_to como estão
             break;
+        case 'all':
+            // Limpar intervalo para buscar todas as contas disponíveis
+            $filters['date_from'] = '';
+            $filters['date_to'] = '';
+            break;
     }
+}
+
+// Calcular horizonte para rótulo da opção 'Todas' (pt-BR mês abreviado)
+$horizonLabel = '';
+try {
+    $database = new Database();
+    $pdo = $database->getConnection();
+    $stmt = $pdo->prepare("SELECT MAX(due_date) as max_date FROM accounts WHERE user_id = :user_id");
+    $stmt->bindParam(':user_id', $userId);
+    $stmt->execute();
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    $monthsPt = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    if (!empty($row['max_date'])) {
+        $maxDate = new DateTime($row['max_date']);
+        $monthIdx = (int)$maxDate->format('n');
+        $horizonLabel = $monthsPt[$monthIdx - 1] . '/' . $maxDate->format('Y');
+    } else {
+        // Fallback: mostrar 10 anos à frente
+        $fallback = new DateTime();
+        $fallback->add(new DateInterval('P120M'));
+        $monthIdx = (int)$fallback->format('n');
+        $horizonLabel = $monthsPt[$monthIdx - 1] . '/' . $fallback->format('Y');
+    }
+} catch (Exception $e) {
+    // Fallback seguro
+    $fallback = new DateTime();
+    $fallback->add(new DateInterval('P120M'));
+    $monthsPt = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    $monthIdx = (int)$fallback->format('n');
+    $horizonLabel = $monthsPt[$monthIdx - 1] . '/' . $fallback->format('Y');
 }
 
 // Parâmetros de ordenação (preservar após POST)
@@ -461,6 +503,7 @@ if ($action == 'list') {
                             <label class="block text-xs font-medium text-gray-700 mb-1">Filtro de Data</label>
                             <select name="filter_date_filter_type" id="dateFilterType" class="border border-gray-300 rounded-md px-3 h-10 w-full text-sm" onchange="toggleDateFilters()">
                                 <option value="">Sem filtro</option>
+                                <option value="all" <?= $filters['date_filter_type'] == 'all' ? 'selected' : '' ?>>Todas (até <?= htmlspecialchars($horizonLabel) ?>)</option>
                                 <option value="month_year" <?= $filters['date_filter_type'] == 'month_year' ? 'selected' : '' ?>>Mês/Ano</option>
                                 <option value="year" <?= $filters['date_filter_type'] == 'year' ? 'selected' : '' ?>>Ano</option>
                                 <option value="custom" <?= $filters['date_filter_type'] == 'custom' ? 'selected' : '' ?>>Customizado</option>
