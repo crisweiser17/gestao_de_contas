@@ -102,54 +102,29 @@ require_once 'partials/header.php';
             </div>
         </div>
 
-        <!-- Estatísticas Financeiras -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <h3 class="text-lg font-semibold text-gray-900 mb-4">
-                    <i class="fas fa-chart-pie text-green-600 mr-2"></i>
-                    Resumo Financeiro
-                </h3>
-                <div class="space-y-4">
-                    <div class="flex justify-between items-center p-3 bg-green-50 rounded">
-                        <span class="text-green-700 font-medium">Total Receitas</span>
-                        <span class="text-green-800 font-bold">R$ <?= number_format($systemStats['total_revenue_amount'], 2, ',', '.') ?></span>
-                    </div>
-                    <div class="flex justify-between items-center p-3 bg-red-50 rounded">
-                        <span class="text-red-700 font-medium">Total Despesas</span>
-                        <span class="text-red-800 font-bold">R$ <?= number_format($systemStats['total_expense_amount'], 2, ',', '.') ?></span>
-                    </div>
-                    <div class="flex justify-between items-center p-3 bg-blue-50 rounded">
-                        <span class="text-blue-700 font-medium">Saldo Geral</span>
-                        <span class="text-blue-800 font-bold">
-                            R$ <?= number_format($systemStats['total_revenue_amount'] - $systemStats['total_expense_amount'], 2, ',', '.') ?>
+        <!-- Usuários Mais Ativos -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                <i class="fas fa-trophy text-yellow-600 mr-2"></i>
+                Usuários Mais Ativos
+            </h3>
+            <div class="space-y-3">
+                <?php foreach (array_slice($systemStats['most_active_users'], 0, 5) as $index => $user): ?>
+                    <div class="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
+                        <div class="flex items-center">
+                            <span class="w-6 h-6 bg-yellow-100 text-yellow-800 rounded-full flex items-center justify-center text-xs font-bold mr-3">
+                                <?= $index + 1 ?>
+                            </span>
+                            <div>
+                                <p class="font-medium text-gray-900"><?= htmlspecialchars($user['name']) ?></p>
+                                <p class="text-xs text-gray-500"><?= htmlspecialchars($user['email']) ?></p>
+                            </div>
+                        </div>
+                        <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
+                            <?= $user['account_count'] ?> contas originais
                         </span>
                     </div>
-                </div>
-            </div>
-
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <h3 class="text-lg font-semibold text-gray-900 mb-4">
-                    <i class="fas fa-trophy text-yellow-600 mr-2"></i>
-                    Usuários Mais Ativos
-                </h3>
-                <div class="space-y-3">
-                    <?php foreach (array_slice($systemStats['most_active_users'], 0, 5) as $index => $user): ?>
-                        <div class="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
-                            <div class="flex items-center">
-                                <span class="w-6 h-6 bg-yellow-100 text-yellow-800 rounded-full flex items-center justify-center text-xs font-bold mr-3">
-                                    <?= $index + 1 ?>
-                                </span>
-                                <div>
-                                    <p class="font-medium text-gray-900"><?= htmlspecialchars($user['name']) ?></p>
-                                    <p class="text-xs text-gray-500"><?= htmlspecialchars($user['email']) ?></p>
-                                </div>
-                            </div>
-                            <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
-                                <?= $user['account_count'] ?> contas
-                            </span>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
+                <?php endforeach; ?>
             </div>
         </div>
 
@@ -184,6 +159,9 @@ require_once 'partials/header.php';
                                 Contas Criadas
                             </th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Categorias
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 Receitas/Despesas
                             </th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -191,6 +169,9 @@ require_once 'partials/header.php';
                             </th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 Cadastro
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Ações
                             </th>
                         </tr>
                     </thead>
@@ -230,7 +211,12 @@ require_once 'partials/header.php';
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                     <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                        <?= $user['total_accounts'] ?> contas
+                                        <?= $user['total_accounts'] ?> contas originais
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                        <?= $user['categories_count'] ?> categorias
                                     </span>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -255,6 +241,12 @@ require_once 'partials/header.php';
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                     <?= date('d/m/Y', strtotime($user['created_at'])) ?>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    <a href="admin_impersonate.php?user_id=<?= (int)$user['id'] ?>" class="inline-flex items-center bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-md text-xs">
+                                        <i class="fas fa-user-secret mr-2"></i>
+                                        Entrar como
+                                    </a>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -337,7 +329,7 @@ require_once 'partials/header.php';
             data: {
                 labels: months,
                 datasets: [{
-                    label: 'Contas Criadas',
+                    label: 'Contas Criadas (originais)',
                     data: accountCounts,
                     borderColor: 'rgb(59, 130, 246)',
                     backgroundColor: 'rgba(59, 130, 246, 0.1)',

@@ -24,14 +24,16 @@ class AdminUser {
                     u.email,
                     u.created_at,
                     u.last_login,
-                    COUNT(a.id) as total_accounts,
-                    COUNT(CASE WHEN a.type = 'receita' THEN 1 END) as total_revenues,
-                    COUNT(CASE WHEN a.type = 'despesa' THEN 1 END) as total_expenses,
+                    COUNT(CASE WHEN a.recurring_parent_id IS NULL THEN 1 END) as total_accounts,
+                    COUNT(CASE WHEN a.recurring_parent_id IS NULL AND a.type = 'receita' THEN 1 END) as total_revenues,
+                    COUNT(CASE WHEN a.recurring_parent_id IS NULL AND a.type = 'despesa' THEN 1 END) as total_expenses,
                     SUM(CASE WHEN a.type = 'receita' THEN a.amount ELSE 0 END) as total_revenue_amount,
                     SUM(CASE WHEN a.type = 'despesa' THEN a.amount ELSE 0 END) as total_expense_amount,
+                    COUNT(DISTINCT c.id) as categories_count,
                     MAX(a.created_at) as last_account_created
                   FROM " . $this->table_name . " u
                   LEFT JOIN accounts a ON u.id = a.user_id
+                  LEFT JOIN categories c ON u.id = c.user_id
                   GROUP BY u.id, u.name, u.email, u.created_at, u.last_login
                   ORDER BY u.created_at DESC";
         
@@ -83,15 +85,16 @@ class AdminUser {
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
         $stats = array_merge($stats, $result);
         
-        // Contas criadas nos últimos 30 dias
+        // Contas criadas nos últimos 30 dias (originais)
         $query = "SELECT COUNT(*) as accounts_last_30_days FROM accounts 
-                  WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
+                  WHERE recurring_parent_id IS NULL
+                  AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
         $stmt = $this->conn->prepare($query);
         $stmt->execute();
         $stats['accounts_last_30_days'] = $stmt->fetch(PDO::FETCH_ASSOC)['accounts_last_30_days'];
         
-        // Usuários mais ativos (por número de contas)
-        $query = "SELECT u.name, u.email, COUNT(a.id) as account_count
+        // Usuários mais ativos (por número de contas originais)
+        $query = "SELECT u.name, u.email, COUNT(CASE WHEN a.recurring_parent_id IS NULL THEN 1 END) as account_count
                   FROM users u
                   LEFT JOIN accounts a ON u.id = a.user_id
                   GROUP BY u.id, u.name, u.email
@@ -132,12 +135,13 @@ class AdminUser {
     public function getUsageChartData() {
         $data = [];
         
-        // Contas criadas por mês nos últimos 12 meses
+        // Contas criadas por mês nos últimos 12 meses (originais)
         $query = "SELECT 
                     DATE_FORMAT(created_at, '%Y-%m') as month,
                     COUNT(*) as count
                   FROM accounts
-                  WHERE created_at >= DATE_SUB(NOW(), INTERVAL 12 MONTH)
+                  WHERE recurring_parent_id IS NULL
+                  AND created_at >= DATE_SUB(NOW(), INTERVAL 12 MONTH)
                   GROUP BY DATE_FORMAT(created_at, '%Y-%m')
                   ORDER BY month";
         $stmt = $this->conn->prepare($query);
