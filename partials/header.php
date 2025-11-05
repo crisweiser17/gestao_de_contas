@@ -6,6 +6,22 @@ function render_header($active) {
         'reports' => ['label' => 'Relatórios', 'href' => 'reports.php'],
     ];
     ?>
+    <?php if (!empty($_SESSION['is_impersonating'])): ?>
+        <div class="bg-yellow-50 border-b border-yellow-200">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 flex items-center justify-between text-sm text-yellow-800">
+                <div class="flex items-center">
+                    <i class="fas fa-user-secret mr-2"></i>
+                    <span>
+                        Impersonando como <strong><?= htmlspecialchars($_SESSION['user_name'] ?? $_SESSION['user_email'] ?? 'Usuário') ?></strong>
+                    </span>
+                </div>
+                <a href="admin_impersonate_exit.php" class="inline-flex items-center px-3 py-1 rounded-md bg-yellow-600 hover:bg-yellow-700 text-white">
+                    <i class="fas fa-undo mr-2"></i>
+                    Voltar para Admin
+                </a>
+            </div>
+        </div>
+    <?php endif; ?>
     <header class="bg-white shadow-sm border-b">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-16">
