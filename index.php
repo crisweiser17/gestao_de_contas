@@ -43,6 +43,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $currentMonth = date('Y-m');
 $currentDate = date('Y-m-d');
 
+// Links rápidos para contas do mês atual e próximo
+$currentMonthNumber = (int)date('n');
+$currentYearNumber = (int)date('Y');
+$nextMonthNumber = $currentMonthNumber === 12 ? 1 : $currentMonthNumber + 1;
+$nextYearNumber = $currentMonthNumber === 12 ? $currentYearNumber + 1 : $currentYearNumber;
+
+$queryBase = [
+    'action' => 'list',
+    'filter_category' => '',
+    'filter_status' => '',
+    'filter_date_filter_type' => 'month_year',
+    'filter_date_month' => $currentMonthNumber,
+    'filter_date_year' => $currentYearNumber,
+    'filter_date_year_only' => '',
+    'filter_date_from' => '',
+    'filter_date_to' => ''
+];
+$currentMonthUrl = 'accounts.php?' . http_build_query($queryBase);
+$queryBase['filter_date_month'] = $nextMonthNumber;
+$queryBase['filter_date_year'] = $nextYearNumber;
+$nextMonthUrl = 'accounts.php?' . http_build_query($queryBase);
+
 // Resumo financeiro do mês atual
 $monthlyIncome = $accountModel->getMonthlyTotal($userId, $currentMonth, 'receita');
 $monthlyExpenses = $accountModel->getMonthlyTotal($userId, $currentMonth, 'despesa');
@@ -232,6 +254,27 @@ $recentTransactions = $accountModel->getRecentTransactions($userId, 10);
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <!-- Alertas de Contas -->
             <div class="space-y-6">
+    <!-- Acesso Rápido aos Meses -->
+    <div class="bg-white rounded-lg shadow">
+        <div class="p-6 border-b border-gray-200">
+            <h3 class="text-lg font-medium text-blue-600">
+                <i class="fas fa-calendar-alt mr-2"></i>
+                Acesso Rápido
+            </h3>
+        </div>
+        <div class="p-6">
+            <div class="flex flex-wrap gap-3">
+                <a href="<?= htmlspecialchars($currentMonthUrl) ?>" class="inline-flex items-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm">
+                    <i class="fas fa-calendar-day mr-2"></i>
+                    Contas do Mês Atual
+                </a>
+                <a href="<?= htmlspecialchars($nextMonthUrl) ?>" class="inline-flex items-center bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm">
+                    <i class="fas fa-calendar-plus mr-2"></i>
+                    Contas do Próximo Mês
+                </a>
+            </div>
+        </div>
+    </div>
                 <!-- Contas Vencidas -->
                 <?php if (count($overdueAccounts) > 0): ?>
                 <div class="bg-white rounded-lg shadow">

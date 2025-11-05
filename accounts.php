@@ -623,13 +623,14 @@ if ($action == 'list') {
                                     <i class="fas fa-sync-alt text-blue-500 mr-2" title="Conta recorrente"></i>
                                     <?php endif; ?>
                                     <div>
-                                        <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($account['description']) ?></div>
-                                        <?php if ($account['url']): ?>
-                                        <a href="<?= htmlspecialchars($account['url']) ?>" target="_blank" 
-                                           class="text-xs text-blue-600 hover:underline">
-                                            <i class="fas fa-external-link-alt mr-1"></i>Link
-                                        </a>
-                                        <?php endif; ?>
+                                        <div class="text-sm font-medium text-gray-900 flex items-center">
+                                            <?= htmlspecialchars($account['description']) ?>
+                                            <?php if ($account['url']): ?>
+                                            <a href="<?= htmlspecialchars($account['url']) ?>" target="_blank" class="ml-2 text-blue-600 hover:text-blue-800" title="Abrir URL associada">
+                                                <i class="fas fa-external-link-alt"></i>
+                                            </a>
+                                            <?php endif; ?>
+                                        </div>
                                     </div>
                                 </div>
                             </td>
@@ -825,13 +826,14 @@ if ($action == 'list') {
                                     <i class="fas fa-sync-alt text-blue-500 mr-2" title="Conta recorrente"></i>
                                     <?php endif; ?>
                                     <div>
-                                        <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($account['description']) ?></div>
-                                        <?php if ($account['url']): ?>
-                                        <a href="<?= htmlspecialchars($account['url']) ?>" target="_blank" 
-                                           class="text-xs text-blue-600 hover:underline">
-                                            <i class="fas fa-external-link-alt mr-1"></i>Link
-                                        </a>
-                                        <?php endif; ?>
+                                        <div class="text-sm font-medium text-gray-900 flex items-center">
+                                            <?= htmlspecialchars($account['description']) ?>
+                                            <?php if ($account['url']): ?>
+                                            <a href="<?= htmlspecialchars($account['url']) ?>" target="_blank" class="ml-2 text-blue-600 hover:text-blue-800" title="Abrir URL associada">
+                                                <i class="fas fa-external-link-alt"></i>
+                                            </a>
+                                            <?php endif; ?>
+                                        </div>
                                     </div>
                                 </div>
                             </td>
