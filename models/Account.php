@@ -141,14 +141,17 @@ class Account {
     // Criar nova conta
     public function create($data) {
         $query = "INSERT INTO " . $this->table_name . " 
-                  (user_id, category_id, description, amount, due_date, type, status, url, is_recurring, notes, attachment) 
-                  VALUES (:user_id, :category_id, :description, :amount, :due_date, :type, :status, :url, :is_recurring, :notes, :attachment)";
+                  (user_id, category_id, description, name, amount, due_date, type, status, url, is_recurring, notes, attachment) 
+                  VALUES (:user_id, :category_id, :description, :name, :amount, :due_date, :type, :status, :url, :is_recurring, :notes, :attachment)";
         
         $stmt = $this->conn->prepare($query);
         
         $stmt->bindParam(':user_id', $data['user_id']);
         $stmt->bindParam(':category_id', $data['category_id']);
         $stmt->bindParam(':description', $data['description']);
+        // adicionar nome (pode ser null)
+        $name = $data['name'] ?? null;
+        $stmt->bindParam(':name', $name);
         $stmt->bindParam(':amount', $data['amount']);
         $stmt->bindParam(':due_date', $data['due_date']);
         $stmt->bindParam(':type', $data['type']);
@@ -166,6 +169,36 @@ class Account {
         return false;
     }
 
+    // Atualizar conta
+    public function update($id, $data, $userId) {
+        $query = "UPDATE " . $this->table_name . " 
+                  SET category_id = :category_id, description = :description, name = :name, amount = :amount, 
+                      due_date = :due_date, type = :type, status = :status, url = :url, notes = :notes, 
+                      attachment = :attachment, is_recurring = :is_recurring
+                  WHERE id = :id AND user_id = :user_id";
+        
+        $stmt = $this->conn->prepare($query);
+        
+        $stmt->bindParam(':id', $id);
+        $stmt->bindParam(':user_id', $userId);
+        $stmt->bindParam(':category_id', $data['category_id']);
+        $stmt->bindParam(':description', $data['description']);
+        $name = $data['name'] ?? null;
+        $stmt->bindParam(':name', $name);
+        $stmt->bindParam(':amount', $data['amount']);
+        $stmt->bindParam(':due_date', $data['due_date']);
+        $stmt->bindParam(':type', $data['type']);
+        $stmt->bindParam(':status', $data['status']);
+        $stmt->bindParam(':url', $data['url']);
+        $stmt->bindParam(':notes', $data['notes']);
+        $stmt->bindParam(':is_recurring', $data['is_recurring'], PDO::PARAM_BOOL);
+        
+        $attachment = $data['attachment'] ?? null;
+        $stmt->bindParam(':attachment', $attachment);
+        
+        return $stmt->execute();
+    }
+
     // Buscar conta por ID
     public function getById($id, $userId) {
         $query = "SELECT a.*, c.name as category_name, a.is_recurring
@@ -179,34 +212,6 @@ class Account {
         $stmt->execute();
         
         return $stmt->fetch(PDO::FETCH_ASSOC);
-    }
-
-    // Atualizar conta
-    public function update($id, $data, $userId) {
-        $query = "UPDATE " . $this->table_name . " 
-                  SET category_id = :category_id, description = :description, amount = :amount, 
-                      due_date = :due_date, type = :type, status = :status, url = :url, notes = :notes, 
-                      attachment = :attachment, is_recurring = :is_recurring
-                  WHERE id = :id AND user_id = :user_id";
-        
-        $stmt = $this->conn->prepare($query);
-        
-        $stmt->bindParam(':id', $id);
-        $stmt->bindParam(':user_id', $userId);
-        $stmt->bindParam(':category_id', $data['category_id']);
-        $stmt->bindParam(':description', $data['description']);
-        $stmt->bindParam(':amount', $data['amount']);
-        $stmt->bindParam(':due_date', $data['due_date']);
-        $stmt->bindParam(':type', $data['type']);
-        $stmt->bindParam(':status', $data['status']);
-        $stmt->bindParam(':url', $data['url']);
-        $stmt->bindParam(':notes', $data['notes']);
-        $stmt->bindParam(':is_recurring', $data['is_recurring'], PDO::PARAM_BOOL);
-        
-        $attachment = $data['attachment'] ?? null;
-        $stmt->bindParam(':attachment', $attachment);
-        
-        return $stmt->execute();
     }
 
     // Atualizar apenas status

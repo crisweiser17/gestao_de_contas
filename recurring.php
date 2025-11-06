@@ -267,6 +267,9 @@ $needsProcessing = array_filter($accountsNeedingGeneration, function($account) u
                                         <i class="fas fa-sync-alt text-blue-500 mr-2" title="Conta Recorrente"></i>
                                         <?= htmlspecialchars($account['description']) ?>
                                     </div>
+                                    <?php if (!empty($account['name'])): ?>
+                                    <div class="text-xs text-gray-500"><?= htmlspecialchars($account['name']) ?></div>
+                                    <?php endif; ?>
                                     <div class="text-sm text-gray-500">
                                         <?= htmlspecialchars($account['category_name']) ?> • 
                                         <span class="text-red-600">
@@ -405,6 +408,9 @@ $needsProcessing = array_filter($accountsNeedingGeneration, function($account) u
                                         <i class="fas fa-sync-alt text-blue-500 mr-2" title="Conta Recorrente"></i>
                                         <?= htmlspecialchars($account['description']) ?>
                                     </div>
+                                    <?php if (!empty($account['name'])): ?>
+                                    <div class="text-xs text-gray-500"><?= htmlspecialchars($account['name']) ?></div>
+                                    <?php endif; ?>
                                     <div class="text-sm text-gray-500">
                                         <?= htmlspecialchars($account['category_name']) ?> • 
                                         <span class="text-green-600">
@@ -512,6 +518,9 @@ $needsProcessing = array_filter($accountsNeedingGeneration, function($account) u
                     <?php foreach ($needsProcessing as $account): ?>
                     <div class="flex justify-between items-center bg-white p-3 rounded border">
                         <span class="text-sm text-gray-900"><?= htmlspecialchars($account['description']) ?></span>
+                        <?php if (!empty($account['name'])): ?>
+                        <span class="text-xs text-gray-500 block"><?= htmlspecialchars($account['name']) ?></span>
+                        <?php endif; ?>
                         <span class="text-xs text-gray-500">
                             Próxima: <?= $account['next_generation_date'] ? formatDate($account['next_generation_date']) : 'Agora' ?>
                         </span>

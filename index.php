@@ -296,6 +296,9 @@ $recentTransactions = $accountModel->getRecentTransactions($userId, 10);
                                         </span>
                                     </div>
                                     <p class="font-medium text-gray-900"><?= htmlspecialchars($account['description']) ?></p>
+                                    <?php if (!empty($account['name'])): ?>
+                                    <p class="text-xs text-gray-500"><?= htmlspecialchars($account['name']) ?></p>
+                                    <?php endif; ?>
                                     <p class="text-sm text-gray-600"><?= formatDate($account['due_date']) ?></p>
                                 </div>
                                 <div class="text-right">
@@ -340,6 +343,9 @@ $recentTransactions = $accountModel->getRecentTransactions($userId, 10);
                             <div class="flex items-center justify-between p-3 bg-yellow-50 rounded-lg week-account" data-type="<?= $account['type'] ?>">
                                 <div>
                                     <p class="font-medium text-gray-900"><?= htmlspecialchars($account['description']) ?></p>
+                                    <?php if (!empty($account['name'])): ?>
+                                    <p class="text-xs text-gray-500"><?= htmlspecialchars($account['name']) ?></p>
+                                    <?php endif; ?>
                                     <p class="text-sm text-gray-600"><?= formatDate($account['due_date']) ?></p>
                                 </div>
                                 <div class="text-right">
