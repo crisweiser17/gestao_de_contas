@@ -187,13 +187,13 @@ $recentTransactions = $accountModel->getRecentTransactions($userId, 10);
         <!-- Previsto vs Realizado (expansível) -->
         <div class="bg-white rounded-lg shadow mb-8">
             <details class="group">
-                <summary class="p-6 cursor-pointer flex items-center justify-between select-none">
+                <summary class="p-6 cursor-pointer flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 select-none">
                     <span class="text-lg font-semibold text-gray-900">
                         <i class="fas fa-chart-line mr-2"></i>
                         Previsto vs Realizado (Mês Atual)
                     </span>
-                    <span class="text-gray-500 group-open:hidden">Clique para expandir</span>
-                    <span class="text-gray-500 hidden group-open:inline">Clique para recolher</span>
+                    <span class="text-gray-500 text-sm group-open:hidden">Clique para expandir</span>
+                    <span class="text-gray-500 text-sm hidden group-open:inline">Clique para recolher</span>
                 </summary>
                 <div class="p-6 pt-0 grid grid-cols-1 md:grid-cols-2 gap-6">
                     <!-- Previsto -->
@@ -254,27 +254,27 @@ $recentTransactions = $accountModel->getRecentTransactions($userId, 10);
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <!-- Alertas de Contas -->
             <div class="space-y-6">
-    <!-- Acesso Rápido aos Meses -->
-    <div class="bg-white rounded-lg shadow">
-        <div class="p-6 border-b border-gray-200">
-            <h3 class="text-lg font-medium text-blue-600">
-                <i class="fas fa-calendar-alt mr-2"></i>
-                Acesso Rápido
-            </h3>
-        </div>
-        <div class="p-6">
-            <div class="flex flex-wrap gap-3">
-                <a href="<?= htmlspecialchars($currentMonthUrl) ?>" class="inline-flex items-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm">
-                    <i class="fas fa-calendar-day mr-2"></i>
-                    Contas do Mês Atual
-                </a>
-                <a href="<?= htmlspecialchars($nextMonthUrl) ?>" class="inline-flex items-center bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm">
-                    <i class="fas fa-calendar-plus mr-2"></i>
-                    Contas do Próximo Mês
-                </a>
-            </div>
-        </div>
-    </div>
+                <div class="bg-white rounded-lg shadow">
+                    <div class="p-6 border-b border-gray-200">
+                        <h3 class="text-lg font-medium text-blue-600">
+                            <i class="fas fa-calendar-alt mr-2"></i>
+                            Acesso Rápido
+                        </h3>
+                    </div>
+                    <div class="p-6">
+                        <p class="text-gray-600 mb-4 text-sm sm:text-base">Acesso rápido às contas por período:</p>
+                        <div class="flex flex-wrap gap-3">
+                            <a href="<?= htmlspecialchars($currentMonthUrl) ?>" class="inline-flex items-center justify-center w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-md text-base" aria-label="Contas do mês atual">
+                                <i class="fas fa-calendar-day mr-2"></i>
+                                Contas do Mês Atual
+                            </a>
+                            <a href="<?= htmlspecialchars($nextMonthUrl) ?>" class="inline-flex items-center justify-center w-full sm:w-auto bg-blue-500 hover:bg-blue-600 text-white px-4 py-3 rounded-md text-base" aria-label="Contas do próximo mês">
+                                <i class="fas fa-calendar-plus mr-2"></i>
+                                Contas do Próximo Mês
+                            </a>
+                        </div>
+                    </div>
+                </div>
                 <!-- Contas Vencidas -->
                 <?php if (count($overdueAccounts) > 0): ?>
                 <div class="bg-white rounded-lg shadow">
@@ -322,15 +322,15 @@ $recentTransactions = $accountModel->getRecentTransactions($userId, 10);
                 <?php if (count($upcomingWeek) > 0): ?>
                 <div class="bg-white rounded-lg shadow">
                     <div class="p-6 border-b border-gray-200">
-                        <div class="flex justify-between items-center mb-4">
+                        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
                             <h3 class="text-lg font-medium text-yellow-600">
                                 <i class="fas fa-clock mr-2"></i>
                                 Vencendo em 7 dias (<span id="week-count"><?= count($upcomingWeek) ?></span>)
                             </h3>
-                            <div class="flex space-x-2">
-                                <button onclick="filterWeekAccounts('all')" id="week-filter-all" class="px-3 py-1 text-xs rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300 active">Todas</button>
-                                <button onclick="filterWeekAccounts('receita')" id="week-filter-receita" class="px-3 py-1 text-xs rounded-md bg-gray-100 text-gray-600 hover:bg-green-100 hover:text-green-700">A Receber</button>
-                                <button onclick="filterWeekAccounts('despesa')" id="week-filter-despesa" class="px-3 py-1 text-xs rounded-md bg-gray-100 text-gray-600 hover:bg-red-100 hover:text-red-700">A Pagar</button>
+                            <div class="flex flex-wrap gap-2 sm:flex-nowrap sm:space-x-2">
+                                <button onclick="filterWeekAccounts('all')" id="week-filter-all" class="px-4 py-2 text-sm rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300 active min-w-[112px]">Todas</button>
+                                <button onclick="filterWeekAccounts('receita')" id="week-filter-receita" class="px-4 py-2 text-sm rounded-md bg-gray-100 text-gray-600 hover:bg-green-100 hover:text-green-700 min-w-[112px]">A Receber</button>
+                                <button onclick="filterWeekAccounts('despesa')" id="week-filter-despesa" class="px-4 py-2 text-sm rounded-md bg-gray-100 text-gray-600 hover:bg-red-100 hover:text-red-700 min-w-[112px]">A Pagar</button>
                             </div>
                         </div>
                     </div>
@@ -368,15 +368,15 @@ $recentTransactions = $accountModel->getRecentTransactions($userId, 10);
                 <?php if (count($upcomingRestOfMonth) > 0): ?>
                 <div class="bg-white rounded-lg shadow">
                     <div class="p-6 border-b border-gray-200">
-                        <div class="flex justify-between items-center mb-4">
+                        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
                             <h3 class="text-lg font-medium text-blue-600">
                                 <i class="fas fa-calendar-week mr-2"></i>
                                 Vencendo até o fim do mês (<span id="month-count"><?= count($upcomingRestOfMonth) ?></span>)
                             </h3>
-                            <div class="flex space-x-2">
-                                <button onclick="filterMonthAccounts('all')" id="month-filter-all" class="px-3 py-1 text-xs rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300 active">Todas</button>
-                                <button onclick="filterMonthAccounts('receita')" id="month-filter-receita" class="px-3 py-1 text-xs rounded-md bg-gray-100 text-gray-600 hover:bg-green-100 hover:text-green-700">A Receber</button>
-                                <button onclick="filterMonthAccounts('despesa')" id="month-filter-despesa" class="px-3 py-1 text-xs rounded-md bg-gray-100 text-gray-600 hover:bg-red-100 hover:text-red-700">A Pagar</button>
+                            <div class="flex flex-wrap gap-2 sm:flex-nowrap sm:space-x-2">
+                                <button onclick="filterMonthAccounts('all')" id="month-filter-all" class="px-4 py-2 text-sm rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300 active min-w-[112px]">Todas</button>
+                                <button onclick="filterMonthAccounts('receita')" id="month-filter-receita" class="px-4 py-2 text-sm rounded-md bg-gray-100 text-gray-600 hover:bg-green-100 hover:text-green-700 min-w-[112px]">A Receber</button>
+                                <button onclick="filterMonthAccounts('despesa')" id="month-filter-despesa" class="px-4 py-2 text-sm rounded-md bg-gray-100 text-gray-600 hover:bg-red-100 hover:text-red-700 min-w-[112px]">A Pagar</button>
                             </div>
                         </div>
                     </div>
@@ -472,7 +472,7 @@ $recentTransactions = $accountModel->getRecentTransactions($userId, 10);
 
         <!-- Botão de Ação Rápida -->
         <div class="fixed bottom-6 right-6">
-            <a href="accounts.php?action=add" class="bg-primary hover:bg-blue-700 text-white rounded-full p-4 shadow-lg transition-colors">
+            <a href="accounts.php?action=add" class="bg-primary hover:bg-blue-700 text-white rounded-full p-4 shadow-lg transition-colors" aria-label="Adicionar conta">
                 <i class="fas fa-plus text-xl"></i>
             </a>
         </div>
