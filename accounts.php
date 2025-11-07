@@ -65,6 +65,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             'notes' => trim($_POST['notes'] ?? '')
         ];
 
+        // Ler flags do modal (se presentes)
+        $editContextPost = $_POST['edit_context'] ?? null;
+        $propagateUrl = isset($_POST['propagate_url']) && $_POST['propagate_url'] === '1';
+        $propagateDescription = isset($_POST['propagate_description']) && $_POST['propagate_description'] === '1';
+        $propagateValue = isset($_POST['propagate_value']) && $_POST['propagate_value'] === '1';
+        $realignFuture = isset($_POST['realign_future_due_dates']) && $_POST['realign_future_due_dates'] === '1';
+        $applySharedToParent = isset($_POST['apply_shared_to_parent']) && $_POST['apply_shared_to_parent'] === '1';
+
         // Validação
         if (empty($data['description'])) {
             $errors[] = 'Descrição é obrigatória';
@@ -158,6 +166,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $errors[] = 'Erro ao criar conta';
                 }
             } else if ($action == 'edit' && $accountId) {
+                // Capturar estado atual antes de atualizar (para detectar pai/filho e comparar URL)
+                $existingAccount = $accountModel->getById($accountId, $userId);
+
                 if ($accountModel->update($accountId, $data, $userId)) {
                     // Gerenciar configuração de recorrência ao editar
                     $existingSetting = $recurringModel->getByAccountId($accountId);
@@ -186,6 +197,76 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     } else if ($existingSetting) {
                         // Desativar recorrência quando desmarcada
                         $recurringModel->deactivate($accountId);
+                    }
+
+                    // Propagação controlada por contexto e flags
+                    $isParent = ($existingAccount && intval($existingAccount['is_recurring']) === 1 && empty($existingAccount['recurring_parent_id']));
+                    $isInstance = ($existingAccount && !empty($existingAccount['recurring_parent_id']));
+
+                    if ($isParent) {
+                        // URL
+                        $oldUrl = $existingAccount['url'] ?? null;
+                        $newUrl = $data['url'] ?? null;
+                        if ($propagateUrl && $newUrl !== $oldUrl) {
+                            $stmt = $pdo->prepare("UPDATE accounts SET url = :url WHERE recurring_parent_id = :parent_id AND user_id = :user_id");
+                            $stmt->execute([
+                                ':url' => $newUrl,
+                                ':parent_id' => $accountId,
+                                ':user_id' => $userId
+                            ]);
+                        }
+                        // Descrição
+                        $oldDesc = $existingAccount['description'] ?? null;
+                        $newDesc = $data['description'] ?? null;
+                        if ($propagateDescription && $newDesc !== $oldDesc) {
+                            $stmt = $pdo->prepare("UPDATE accounts SET description = :description WHERE recurring_parent_id = :parent_id AND user_id = :user_id");
+                            $stmt->execute([
+                                ':description' => $newDesc,
+                                ':parent_id' => $accountId,
+                                ':user_id' => $userId
+                            ]);
+                        }
+                        // Valor
+                        $oldAmount = $existingAccount['amount'] ?? null;
+                        $newAmount = $data['amount'] ?? null;
+                        if ($propagateValue && $newAmount !== $oldAmount) {
+                            $stmt = $pdo->prepare("UPDATE accounts SET amount = :amount WHERE recurring_parent_id = :parent_id AND user_id = :user_id AND status = 'pendente' AND due_date >= CURDATE()");
+                            $stmt->execute([
+                                ':amount' => $newAmount,
+                                ':parent_id' => $accountId,
+                                ':user_id' => $userId
+                            ]);
+                        }
+                        // Vencimento: re-alinhar futuras
+                        $oldDue = $existingAccount['due_date'] ?? null;
+                        $newDue = $data['due_date'] ?? null;
+                        if ($realignFuture && $newDue && $oldDue && $newDue !== $oldDue) {
+                            $freqType = $_POST['frequency_type'] ?? ($existingSetting['frequency_type'] ?? 'mensal');
+                            $freqInterval = $_POST['frequency_interval'] ?? ($existingSetting['frequency_interval'] ?? 1);
+                            $startDate = $recurringModel->calculateNextDate($newDue, $freqType, $freqInterval, $newDue);
+                            $fetchStmt = $pdo->prepare("SELECT id, due_date FROM accounts WHERE recurring_parent_id = :parent_id AND user_id = :user_id AND status = 'pendente' AND due_date >= CURDATE() ORDER BY due_date ASC");
+                            $fetchStmt->execute([':parent_id' => $accountId, ':user_id' => $userId]);
+                            $children = $fetchStmt->fetchAll(PDO::FETCH_ASSOC);
+                            $nextDate = $startDate;
+                            $updateStmt = $pdo->prepare("UPDATE accounts SET due_date = :due_date WHERE id = :id AND user_id = :user_id");
+                            foreach ($children as $child) {
+                                $updateStmt->execute([':due_date' => $nextDate, ':id' => $child['id'], ':user_id' => $userId]);
+                                $nextDate = $recurringModel->calculateNextDate($nextDate, $freqType, $freqInterval, $newDue);
+                            }
+                        }
+                    } else if ($isInstance && $applySharedToParent) {
+                        // Aplicar campos compartilhados ao pai
+                        $parentId = $existingAccount['recurring_parent_id'];
+                        $fields = [];
+                        $params = [':id' => $parentId, ':user_id' => $userId];
+                        if (!empty($data['url'])) { $fields[] = 'url = :url'; $params[':url'] = $data['url']; }
+                        if (!empty($data['description'])) { $fields[] = 'description = :description'; $params[':description'] = $data['description']; }
+                        if (!empty($data['amount'])) { $fields[] = 'amount = :amount'; $params[':amount'] = $data['amount']; }
+                        if (!empty($fields)) {
+                            $sql = 'UPDATE accounts SET ' . implode(', ', $fields) . ' WHERE id = :id AND user_id = :user_id';
+                            $stmt = $pdo->prepare($sql);
+                            $stmt->execute($params);
+                        }
                     }
 
                     $success = 'Conta atualizada com sucesso!';
@@ -407,6 +488,12 @@ if ($action == 'list') {
     if (!$account) {
         $action = 'list';
         $errors[] = 'Conta não encontrada';
+    }
+    // Definir contexto de edição (pai/instância)
+    $editContext = $_GET['edit_context'] ?? ($_POST['edit_context'] ?? null);
+    if ($editContext === null) {
+        $isParent = ($account && intval($account['is_recurring']) === 1 && empty($account['recurring_parent_id']));
+        $editContext = $isParent ? 'parent' : 'instance';
     }
 }
 ?>
@@ -738,7 +825,7 @@ if ($action == 'list') {
                                 <?php endif; ?>
                             </td>
                             <td class="px-6 py-4 text-sm space-x-2">
-                                <a href="?action=edit&id=<?= $account['id'] ?>" 
+                                <a href="?action=edit&id=<?= $account['id'] ?>&edit_context=instance" 
                                    class="text-blue-600 hover:text-blue-800">
                                     <i class="fas fa-edit"></i>
                                 </a>
@@ -944,7 +1031,7 @@ if ($action == 'list') {
                                 <?php endif; ?>
                             </td>
                             <td class="px-6 py-4 text-sm space-x-2">
-                                <a href="?action=edit&id=<?= $account['id'] ?>" 
+                                <a href="?action=edit&id=<?= $account['id'] ?>&edit_context=instance" 
                                    class="text-blue-600 hover:text-blue-800">
                                     <i class="fas fa-edit"></i>
                                 </a>
@@ -994,11 +1081,17 @@ if ($action == 'list') {
                 </h2>
             </div>
 
-            <form method="POST" enctype="multipart/form-data" class="p-6 space-y-6">
+            <form method="POST" enctype="multipart/form-data" class="p-6 space-y-6" id="account-form" onsubmit="return handleFormSubmit(event)">
                 <input type="hidden" name="action" value="<?= $action ?>">
                 <?php if ($action == 'edit'): ?>
                 <input type="hidden" name="id" value="<?= $accountId ?>">
                 <?php endif; ?>
+                <input type="hidden" name="edit_context" value="<?= htmlspecialchars($editContext ?? ($_GET['edit_context'] ?? '')) ?>">
+                <input type="hidden" id="propagate_url" name="propagate_url" value="0">
+                <input type="hidden" id="propagate_description" name="propagate_description" value="0">
+                <input type="hidden" id="propagate_value" name="propagate_value" value="0">
+                <input type="hidden" id="realign_future_due_dates" name="realign_future_due_dates" value="0">
+                <input type="hidden" id="apply_shared_to_parent" name="apply_shared_to_parent" value="0">
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <!-- Descrição -->
@@ -1222,6 +1315,90 @@ if ($action == 'list') {
             </form>
         </div>
         <?php endif; ?>
+    <!-- Modal Tailwind para edição de recorrentes -->
+    <div id="recurringEditModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 items-center justify-center">
+      <div class="bg-white rounded-lg shadow-lg w-full max-w-xl p-6">
+        <h3 class="text-lg font-semibold mb-4">Confirmar alterações em recorrência</h3>
+        <div id="modal-parent-section" class="space-y-3 hidden">
+          <p class="text-sm text-gray-700">Você está editando a conta recorrente pai. Escolha como propagar:</p>
+          <label class="flex items-center space-x-2">
+            <input type="checkbox" id="modal_propagate_url" class="h-4 w-4" checked>
+            <span class="text-sm">Propagar URL para todas as instâncias</span>
+          </label>
+          <label class="flex items-center space-x-2">
+            <input type="checkbox" id="modal_propagate_description" class="h-4 w-4" checked>
+            <span class="text-sm">Propagar descrição para todas as instâncias</span>
+          </label>
+          <label class="flex items-center space-x-2">
+            <input type="checkbox" id="modal_propagate_value" class="h-4 w-4">
+            <span class="text-sm">Propagar valor para instâncias futuras pendentes</span>
+          </label>
+          <label class="flex items-center space-x-2">
+            <input type="checkbox" id="modal_realign_future_due_dates" class="h-4 w-4" checked>
+            <span class="text-sm">Re-alinhar vencimentos das instâncias futuras</span>
+          </label>
+        </div>
+        <div id="modal-instance-section" class="space-y-3 hidden">
+          <p class="text-sm text-gray-700">Você está editando uma instância recorrente. Escolha:</p>
+          <label class="flex items-center space-x-2">
+            <input type="checkbox" id="modal_apply_shared_to_parent" class="h-4 w-4">
+            <span class="text-sm">Aplicar URL/descrição/valor ao pai</span>
+          </label>
+        </div>
+        <div class="mt-6 flex justify-end space-x-3">
+          <button type="button" class="px-4 py-2 bg-gray-200 rounded" onclick="closeRecurringModal()">Cancelar</button>
+          <button type="button" class="px-4 py-2 bg-primary text-white rounded" onclick="confirmRecurringModal()">Confirmar</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Contexto definido no servidor
+      window.EDIT_CONTEXT = '<?= htmlspecialchars($editContext ?? ($_GET['edit_context'] ?? '')) ?>';
+      function handleFormSubmit(e) {
+        const form = document.getElementById('account-form');
+        const isEdit = '<?= $action ?>' === 'edit';
+        const hasContext = (window.EDIT_CONTEXT === 'parent' || window.EDIT_CONTEXT === 'instance');
+        if (isEdit && hasContext) {
+          e.preventDefault();
+          openRecurringModal();
+          return false;
+        }
+        return true;
+      }
+      function openRecurringModal() {
+        const modal = document.getElementById('recurringEditModal');
+        const parentSec = document.getElementById('modal-parent-section');
+        const instanceSec = document.getElementById('modal-instance-section');
+        if (window.EDIT_CONTEXT === 'parent') {
+          parentSec.classList.remove('hidden');
+          instanceSec.classList.add('hidden');
+        } else {
+          instanceSec.classList.remove('hidden');
+          parentSec.classList.add('hidden');
+        }
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      }
+      function closeRecurringModal() {
+        const modal = document.getElementById('recurringEditModal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+      function confirmRecurringModal() {
+        // Mapear checks para hidden inputs
+        const toInt = (b) => b ? '1' : '0';
+        const ctx = window.EDIT_CONTEXT === 'parent' ? 'parent' : 'instance';
+        document.getElementById('propagate_url').value = toInt(document.getElementById('modal_propagate_url')?.checked);
+        document.getElementById('propagate_description').value = toInt(document.getElementById('modal_propagate_description')?.checked);
+        document.getElementById('propagate_value').value = toInt(document.getElementById('modal_propagate_value')?.checked);
+        document.getElementById('realign_future_due_dates').value = toInt(document.getElementById('modal_realign_future_due_dates')?.checked);
+        document.getElementById('apply_shared_to_parent').value = toInt(document.getElementById('modal_apply_shared_to_parent')?.checked);
+        closeRecurringModal();
+        document.getElementById('account-form').submit();
+      }
+    </script>
+
     </main>
 
     <!-- Lightbox Modal -->

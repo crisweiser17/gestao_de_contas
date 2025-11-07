@@ -534,7 +534,7 @@ $needsProcessing = array_filter($accountsNeedingGeneration, function($account) u
 
     <script>
         function openEditModal(accountId) {
-            window.location.href = 'accounts.php?action=edit&id=' + accountId;
+            window.location.href = 'accounts.php?action=edit&id=' + accountId + '&edit_context=parent';
         }
     </script>
 </body>
