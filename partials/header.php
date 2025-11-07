@@ -166,14 +166,13 @@ function render_header($active) {
         </div>
     </header>
     <script>
+        // Menu mobile
         document.addEventListener('DOMContentLoaded', function() {
             const btn = document.getElementById('mobileMenuBtn');
             const menu = document.getElementById('mobileMenu');
             const iconOpen = document.getElementById('mobileMenuIconOpen');
             const iconClose = document.getElementById('mobileMenuIconClose');
-
             if (!btn || !menu) return;
-
             const openMenu = () => {
                 menu.classList.remove('hidden');
                 iconOpen.classList.add('hidden');
@@ -186,34 +185,97 @@ function render_header($active) {
                 iconClose.classList.add('hidden');
                 btn.setAttribute('aria-expanded', 'false');
             };
-
             btn.addEventListener('click', function() {
                 const isHidden = menu.classList.contains('hidden');
                 isHidden ? openMenu() : closeMenu();
             });
-
-            // Fechar ao clicar em qualquer link no menu mobile
-            menu.querySelectorAll('a').forEach(a => {
-                a.addEventListener('click', closeMenu);
-            });
-
-            // Fechar quando clicar fora do header/menu
+            menu.querySelectorAll('a').forEach(a => a.addEventListener('click', closeMenu));
             document.addEventListener('click', (e) => {
                 const clickOutside = !menu.contains(e.target) && !btn.contains(e.target);
                 const isOpen = !menu.classList.contains('hidden');
                 if (isOpen && clickOutside) closeMenu();
             });
-
-            // Fechar com ESC
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape') closeMenu();
-            });
-
-            // Sincronizar com breakpoint md (>=768px)
+            document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu(); });
             const mql = window.matchMedia('(min-width: 768px)');
             const onBreakpoint = (e) => { if (e.matches) closeMenu(); };
-            if (mql.addEventListener) mql.addEventListener('change', onBreakpoint);
-            else mql.addListener(onBreakpoint);
+            if (mql.addEventListener) mql.addEventListener('change', onBreakpoint); else mql.addListener(onBreakpoint);
+        });
+
+        // Injetar manifest no <head>
+        (function injectManifest(){
+            try {
+                var link = document.createElement('link');
+                link.rel = 'manifest';
+                link.href = 'manifest.webmanifest';
+                document.head.appendChild(link);
+                // Apple touch icon (iOS)
+                var apple = document.createElement('link');
+                apple.rel = 'apple-touch-icon';
+                apple.href = 'icons/gestao.svg';
+                document.head.appendChild(apple);
+                // Theme color
+                var theme = document.createElement('meta');
+                theme.name = 'theme-color';
+                theme.content = '#2563EB';
+                document.head.appendChild(theme);
+            } catch(e) {}
+        })();
+
+        // Registrar service worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('/sw.js').catch(function(err){ console.warn('SW fail', err); });
+            });
+        }
+
+        // Banner de instalação (mobile-only)
+        document.addEventListener('DOMContentLoaded', function() {
+            var isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent);
+            var deferredPrompt = null;
+            var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+            var installed = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+            
+            if (!isMobile || installed) return;
+            
+            var banner = document.createElement('div');
+            banner.id = 'installBanner';
+            banner.className = 'fixed bottom-4 left-4 right-4 md:left-auto md:right-8 md:bottom-8 md:w-96 bg-white border border-gray-200 shadow-xl rounded-lg p-3 flex items-center z-50';
+            banner.innerHTML = `
+                <div class="flex items-center">
+                    <img src="icons/gestao.svg" alt="Gestao de Contas" class="w-10 h-10 mr-3">
+                    <div class="flex-1">
+                        <div class="text-sm font-medium text-gray-900">Instalar Gestao de Contas</div>
+                        <div class="text-xs text-gray-600">Crie um atalho na tela inicial</div>
+                    </div>
+                    <button id="installBtn" class="ml-3 px-3 py-2 text-xs bg-primary text-white rounded hover:bg-primary/90">Instalar</button>
+                    <button id="installClose" class="ml-2 text-gray-400 hover:text-gray-600" aria-label="Fechar"><i class="fas fa-times"></i></button>
+                </div>
+            `;
+            document.body.appendChild(banner);
+            
+            var btn = document.getElementById('installBtn');
+            var close = document.getElementById('installClose');
+            close.addEventListener('click', function(){ banner.remove(); });
+            
+            window.addEventListener('beforeinstallprompt', function(e){
+                e.preventDefault();
+                deferredPrompt = e;
+                btn.disabled = false;
+            });
+            
+            // iOS fallback: mostrar instruções
+            btn.addEventListener('click', function(){
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    deferredPrompt.userChoice.finally(function(){ banner.remove(); });
+                } else if (isIOS) {
+                    alert('Para adicionar, toque no ícone de compartilhar \u2191 e escolha "Adicionar à Tela de Início".');
+                    banner.remove();
+                } else {
+                    alert('Seu navegador não suporta instalação automática. Use o menu para adicionar à tela inicial.');
+                    banner.remove();
+                }
+            });
         });
     </script>
     <?php
