@@ -18,15 +18,24 @@ $userId = $_SESSION['user_id'];
 
 // Períodos disponíveis para projeção
 $periods = [
-    30 => '30 dias',
-    60 => '60 dias', 
-    90 => '90 dias',
-    180 => '180 dias',
+    30 => '1 mês',
+    60 => '2 meses', 
+    90 => '3 meses',
+    180 => '6 meses',
     365 => '1 ano'
 ];
 
 $selectedPeriod = $_GET['period'] ?? 90;
 $selectedPeriod = in_array($selectedPeriod, array_keys($periods)) ? $selectedPeriod : 90;
+
+// Ajustar período para incluir o fim do mês do último mês do intervalo
+$today = date('Y-m-d');
+$endCandidate = date('Y-m-d', strtotime("+{$selectedPeriod} days"));
+$endMonthLastDay = date('Y-m-t', strtotime($endCandidate));
+$daysAdjusted = (int) floor((strtotime($endMonthLastDay) - strtotime($today)) / 86400);
+if ($daysAdjusted > $selectedPeriod) {
+    $selectedPeriod = $daysAdjusted;
+}
 
 // Calcular projeções
 function calculateCashFlowProjection($userId, $days) {

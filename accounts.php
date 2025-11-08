@@ -492,8 +492,11 @@ if ($action == 'list') {
     // Definir contexto de edição (pai/instância)
     $editContext = $_GET['edit_context'] ?? ($_POST['edit_context'] ?? null);
     if ($editContext === null) {
-        $isParent = ($account && intval($account['is_recurring']) === 1 && empty($account['recurring_parent_id']));
-        $editContext = $isParent ? 'parent' : 'instance';
+        if ($account && intval($account['is_recurring']) === 1) {
+            $editContext = empty($account['recurring_parent_id']) ? 'parent' : 'instance';
+        } else {
+            $editContext = null;
+        }
     }
 }
 ?>
@@ -825,7 +828,7 @@ if ($action == 'list') {
                                 <?php endif; ?>
                             </td>
                             <td class="px-6 py-4 text-sm space-x-2">
-                                <a href="?action=edit&id=<?= $account['id'] ?>&edit_context=instance" 
+                                <a href="?action=edit&id=<?= $account['id'] ?><?= (intval($account['is_recurring']) === 1 ? (empty($account['recurring_parent_id']) ? '&edit_context=parent' : '&edit_context=instance') : '') ?>" 
                                    class="text-blue-600 hover:text-blue-800">
                                     <i class="fas fa-edit"></i>
                                 </a>
@@ -1031,7 +1034,7 @@ if ($action == 'list') {
                                 <?php endif; ?>
                             </td>
                             <td class="px-6 py-4 text-sm space-x-2">
-                                <a href="?action=edit&id=<?= $account['id'] ?>&edit_context=instance" 
+                                <a href="?action=edit&id=<?= $account['id'] ?><?= (intval($account['is_recurring']) === 1 ? (empty($account['recurring_parent_id']) ? '&edit_context=parent' : '&edit_context=instance') : '') ?>" 
                                    class="text-blue-600 hover:text-blue-800">
                                     <i class="fas fa-edit"></i>
                                 </a>
