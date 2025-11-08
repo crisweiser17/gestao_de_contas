@@ -278,6 +278,7 @@ if ($action == 'export_pdf') {
     <title><?= APP_NAME ?> - Relatórios</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script>
         tailwind.config = {
@@ -492,17 +493,30 @@ if ($action == 'export_pdf') {
         </div>
 
         <!-- Gráficos -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-            <!-- Gráfico por Categoria -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+            <!-- Gráfico Receitas por Categoria -->
             <div class="bg-white rounded-lg shadow">
                 <div class="p-6 border-b border-gray-200">
-                    <h3 class="text-lg font-semibold text-gray-900">
+                    <h3 class="text-lg font-semibold text-green-600">
                         <i class="fas fa-chart-pie mr-2"></i>
-                        Por Categoria
+                        Receitas por Categoria
                     </h3>
                 </div>
                 <div class="p-6">
-                    <canvas id="categoryChart" height="200"></canvas>
+                    <canvas id="categoryRevenueChart" height="200"></canvas>
+                </div>
+            </div>
+
+            <!-- Gráfico Despesas por Categoria -->
+            <div class="bg-white rounded-lg shadow">
+                <div class="p-6 border-b border-gray-200">
+                    <h3 class="text-lg font-semibold text-red-600">
+                        <i class="fas fa-chart-pie mr-2"></i>
+                        Despesas por Categoria
+                    </h3>
+                </div>
+                <div class="p-6">
+                    <canvas id="categoryExpenseChart" height="200"></canvas>
                 </div>
             </div>
 
@@ -641,39 +655,92 @@ if ($action == 'export_pdf') {
             toggleReportDateFilters();
         });
 
-        // Dados para gráfico por categoria
-        const categoryData = {
+        // Registrar plugin de DataLabels
+        Chart.register(ChartDataLabels);
+
+        // Dados para gráficos por categoria (receitas e despesas)
+        const revenueCategoryData = {
             labels: [
-                <?php foreach ($byCategory as $category): ?>
+                <?php foreach ($receitas as $category): ?>
                 '<?= addslashes($category['name']) ?>',
                 <?php endforeach; ?>
             ],
             datasets: [{
                 data: [
-                    <?php foreach ($byCategory as $category): ?>
+                    <?php foreach ($receitas as $category): ?>
                     <?= $category['total'] ?>,
                     <?php endforeach; ?>
                 ],
                 backgroundColor: [
-                    '#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6',
-                    '#EC4899', '#14B8A6', '#F97316', '#6366F1', '#84CC16'
+                    '#10B981', '#22C55E', '#34D399', '#6EE7B7', '#A7F3D0',
+                    '#86EFAC', '#4ADE80', '#2DD4BF', '#14B8A6', '#059669'
                 ]
             }]
         };
 
-        // Gráfico por categoria
-        new Chart(document.getElementById('categoryChart'), {
-            type: 'doughnut',
-            data: categoryData,
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'bottom'
+        const expenseCategoryData = {
+            labels: [
+                <?php foreach ($despesas as $category): ?>
+                '<?= addslashes($category['name']) ?>',
+                <?php endforeach; ?>
+            ],
+            datasets: [{
+                data: [
+                    <?php foreach ($despesas as $category): ?>
+                    <?= $category['total'] ?>,
+                    <?php endforeach; ?>
+                ],
+                backgroundColor: [
+                    '#EF4444', '#F97316', '#FB7185', '#DC2626', '#F43F5E',
+                    '#E11D48', '#EA580C', '#C2410C', '#FF7F50', '#F59E0B'
+                ]
+            }]
+        };
+
+        // Opções comuns com percentuais visíveis
+        const pieOptionsWithPercent = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom' },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.parsed || 0;
+                            const dataArr = context.dataset.data || [];
+                            const total = dataArr.reduce((a, b) => a + b, 0);
+                            const pct = total ? ((value / total) * 100).toFixed(1) + '%' : '0%';
+                            return `${label}: R$ ${value.toLocaleString('pt-BR')} (${pct})`;
+                        }
+                    }
+                },
+                datalabels: {
+                    color: '#111827',
+                    font: { size: 12, weight: 'bold' },
+                    formatter: function(value, ctx) {
+                        const dataArr = ctx.dataset.data || [];
+                        const total = dataArr.reduce((a, b) => a + b, 0);
+                        if (!total) return '';
+                        const pct = (value / total) * 100;
+                        return pct.toFixed(1) + '%';
                     }
                 }
             }
+        };
+
+        // Gráfico de receitas por categoria
+        new Chart(document.getElementById('categoryRevenueChart'), {
+            type: 'doughnut',
+            data: revenueCategoryData,
+            options: pieOptionsWithPercent
+        });
+
+        // Gráfico de despesas por categoria
+        new Chart(document.getElementById('categoryExpenseChart'), {
+            type: 'doughnut',
+            data: expenseCategoryData,
+            options: pieOptionsWithPercent
         });
 
         // Gráfico de comparação
