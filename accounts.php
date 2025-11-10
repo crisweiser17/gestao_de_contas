@@ -852,58 +852,43 @@ if ($action == 'list') {
                         <?php endforeach; ?>
                         <?php endif; ?>
                         
-                        <!-- Linha de Subtotais -->
-                        <tr class="bg-red-50 font-medium">
-                            <td class="px-6 py-3 text-red-700" colspan="3">
-                                <div class="flex items-center">
-                                    <i class="fas fa-hourglass-half mr-2"></i>
-                                    Total Pendente
-                                    <span class="ml-2 text-xs bg-red-100 text-red-600 px-2 py-1 rounded-full cursor-help" 
-                                          title="Inclui todas as contas filtradas (categoria, data, etc.), ignorando o filtro de status">
-                                        <i class="fas fa-info-circle"></i>
-                                    </span>
-                                </div>
-                            </td>
-                            <td class="px-6 py-3 text-red-700 text-right">
-                                R$ <?= number_format($totalAmountExpensesPending, 2, ',', '.') ?>
-                            </td>
-                            <td class="px-6 py-3" colspan="3"></td>
-                        </tr>
-                        <tr class="bg-red-50 font-medium">
-                            <td class="px-6 py-3 text-red-700" colspan="3">
-                                <div class="flex items-center">
-                                    <i class="fas fa-check-circle mr-2"></i>
-                                    Total Pago
-                                    <span class="ml-2 text-xs bg-red-100 text-red-600 px-2 py-1 rounded-full cursor-help" 
-                                          title="Inclui todas as contas filtradas (categoria, data, etc.), ignorando o filtro de status">
-                                        <i class="fas fa-info-circle"></i>
-                                    </span>
-                                </div>
-                            </td>
-                            <td class="px-6 py-3 text-red-700 text-right">
-                                R$ <?= number_format($totalAmountExpensesPaid, 2, ',', '.') ?>
-                            </td>
-                            <td class="px-6 py-3" colspan="3"></td>
-                        </tr>
-                        
-                        <!-- Linha de Total -->
+                        <!-- Linha de Totais (única linha) -->
                         <tr class="bg-red-50 border-t-2 border-red-200 font-semibold">
                             <td class="px-6 py-4 text-red-700" colspan="3">
                                 <div class="flex items-center">
-                                    <i class="fas fa-calculator mr-2"></i>
-                                    Total Geral
-                                    <?php if ($totalExpenses > $itemsPerPageExpenses): ?>
+                                    <i class="fas fa-layer-group mr-2"></i>
+                                    Totais
                                     <span class="ml-2 text-xs bg-red-100 text-red-600 px-2 py-1 rounded-full cursor-help" 
-                                          title="Este total inclui todas as <?= $totalExpenses ?> contas filtradas, não apenas as <?= min($itemsPerPageExpenses, count($accountsExpenses)) ?> exibidas nesta página">
+                                          title="Totais considerando todas as contas filtradas (categoria, data, etc.). O status é ignorado nos subtotais de Pendente e Pago.">
                                         <i class="fas fa-info-circle"></i>
                                     </span>
-                                    <?php endif; ?>
                                 </div>
                             </td>
-                            <td class="px-6 py-4 text-red-700 text-right font-bold text-lg">
-                                R$ <?= number_format($totalAmountExpenses, 2, ',', '.') ?>
+                            <td class="px-6 py-4 text-right" colspan="4">
+                                <div class="flex items-center justify-end gap-6">
+                                    <div class="flex items-center text-red-700">
+                                        <i class="fas fa-hourglass-half mr-2"></i>
+                                        <span class="mr-2">Pendente</span>
+                                        <span class="font-bold">R$ <?= number_format($totalAmountExpensesPending, 2, ',', '.') ?></span>
+                                    </div>
+                                    <div class="flex items-center text-red-700">
+                                        <i class="fas fa-check-circle mr-2"></i>
+                                        <span class="mr-2">Pago</span>
+                                        <span class="font-bold">R$ <?= number_format($totalAmountExpensesPaid, 2, ',', '.') ?></span>
+                                    </div>
+                                    <div class="flex items-center text-red-700">
+                                        <i class="fas fa-calculator mr-2"></i>
+                                        <span class="mr-2">Geral</span>
+                                        <span class="font-bold text-lg">R$ <?= number_format($totalAmountExpenses, 2, ',', '.') ?></span>
+                                        <?php if ($totalExpenses > $itemsPerPageExpenses): ?>
+                                        <span class="ml-2 text-xs bg-red-100 text-red-600 px-2 py-1 rounded-full cursor-help" 
+                                              title="Este total inclui todas as <?= $totalExpenses ?> contas filtradas, não apenas as <?= min($itemsPerPageExpenses, count($accountsExpenses)) ?> exibidas nesta página">
+                                            <i class="fas fa-info-circle"></i>
+                                        </span>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
                             </td>
-                            <td class="px-6 py-4" colspan="3"></td>
                         </tr>
                     </tbody>
                 </table>
@@ -1092,58 +1077,43 @@ if ($action == 'list') {
                         <?php endforeach; ?>
                         <?php endif; ?>
                         
-                        <!-- Linha de Subtotais -->
-                        <tr class="bg-green-50 font-medium">
-                            <td class="px-6 py-3 text-green-700" colspan="3">
-                                <div class="flex items-center">
-                                    <i class="fas fa-hourglass-half mr-2"></i>
-                                    Total Pendente
-                                    <span class="ml-2 text-xs bg-green-100 text-green-600 px-2 py-1 rounded-full cursor-help" 
-                                          title="Inclui todas as contas filtradas (categoria, data, etc.), ignorando o filtro de status">
-                                        <i class="fas fa-info-circle"></i>
-                                    </span>
-                                </div>
-                            </td>
-                            <td class="px-6 py-3 text-green-700 text-right">
-                                R$ <?= number_format($totalAmountRevenuesPending, 2, ',', '.') ?>
-                            </td>
-                            <td class="px-6 py-3" colspan="3"></td>
-                        </tr>
-                        <tr class="bg-green-50 font-medium">
-                            <td class="px-6 py-3 text-green-700" colspan="3">
-                                <div class="flex items-center">
-                                    <i class="fas fa-check-circle mr-2"></i>
-                                    Total Recebida
-                                    <span class="ml-2 text-xs bg-green-100 text-green-600 px-2 py-1 rounded-full cursor-help" 
-                                          title="Inclui todas as contas filtradas (categoria, data, etc.), ignorando o filtro de status">
-                                        <i class="fas fa-info-circle"></i>
-                                    </span>
-                                </div>
-                            </td>
-                            <td class="px-6 py-3 text-green-700 text-right">
-                                R$ <?= number_format($totalAmountRevenuesReceived, 2, ',', '.') ?>
-                            </td>
-                            <td class="px-6 py-3" colspan="3"></td>
-                        </tr>
-                        
-                        <!-- Linha de Total -->
+                        <!-- Linha de Totais (única linha) -->
                         <tr class="bg-green-50 border-t-2 border-green-200 font-semibold">
                             <td class="px-6 py-4 text-green-700" colspan="3">
                                 <div class="flex items-center">
-                                    <i class="fas fa-calculator mr-2"></i>
-                                    Total Geral
-                                    <?php if ($totalRevenues > $itemsPerPageRevenues): ?>
+                                    <i class="fas fa-layer-group mr-2"></i>
+                                    Totais
                                     <span class="ml-2 text-xs bg-green-100 text-green-600 px-2 py-1 rounded-full cursor-help" 
-                                          title="Este total inclui todas as <?= $totalRevenues ?> contas filtradas, não apenas as <?= min($itemsPerPageRevenues, count($accountsRevenues)) ?> exibidas nesta página">
+                                          title="Totais considerando todas as contas filtradas (categoria, data, etc.). O status é ignorado nos subtotais de Pendente e Recebida.">
                                         <i class="fas fa-info-circle"></i>
                                     </span>
-                                    <?php endif; ?>
                                 </div>
                             </td>
-                            <td class="px-6 py-4 text-green-700 text-right font-bold text-lg">
-                                R$ <?= number_format($totalAmountRevenues, 2, ',', '.') ?>
+                            <td class="px-6 py-4 text-right" colspan="4">
+                                <div class="flex items-center justify-end gap-6">
+                                    <div class="flex items-center text-green-700">
+                                        <i class="fas fa-hourglass-half mr-2"></i>
+                                        <span class="mr-2">Pendente</span>
+                                        <span class="font-bold">R$ <?= number_format($totalAmountRevenuesPending, 2, ',', '.') ?></span>
+                                    </div>
+                                    <div class="flex items-center text-green-700">
+                                        <i class="fas fa-check-circle mr-2"></i>
+                                        <span class="mr-2">Recebida</span>
+                                        <span class="font-bold">R$ <?= number_format($totalAmountRevenuesReceived, 2, ',', '.') ?></span>
+                                    </div>
+                                    <div class="flex items-center text-green-700">
+                                        <i class="fas fa-calculator mr-2"></i>
+                                        <span class="mr-2">Geral</span>
+                                        <span class="font-bold text-lg">R$ <?= number_format($totalAmountRevenues, 2, ',', '.') ?></span>
+                                        <?php if ($totalRevenues > $itemsPerPageRevenues): ?>
+                                        <span class="ml-2 text-xs bg-green-100 text-green-600 px-2 py-1 rounded-full cursor-help" 
+                                              title="Este total inclui todas as <?= $totalRevenues ?> contas filtradas, não apenas as <?= min($itemsPerPageRevenues, count($accountsRevenues)) ?> exibidas nesta página">
+                                            <i class="fas fa-info-circle"></i>
+                                        </span>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
                             </td>
-                            <td class="px-6 py-4" colspan="3"></td>
                         </tr>
                     </tbody>
                 </table>
