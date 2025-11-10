@@ -427,6 +427,38 @@ try {
     $horizonLabel = $monthsPt[$monthIdx - 1] . '/' . $fallback->format('Y');
 }
 
+// Período selecionado para exibir nos títulos
+$periodLabel = '';
+switch ($filters['date_filter_type'] ?? '') {
+    case 'month_year':
+        if (!empty($filters['date_month']) && !empty($filters['date_year'])) {
+            $monthIdx = (int)$filters['date_month'];
+            $periodLabel = ($monthsPt[$monthIdx - 1] ?? '') . '/' . $filters['date_year'];
+        }
+        break;
+    case 'year':
+        if (!empty($filters['date_year'])) {
+            $periodLabel = $filters['date_year'];
+        }
+        break;
+    case 'custom':
+        if (!empty($filters['date_from']) && !empty($filters['date_to'])) {
+            $periodLabel = date('d/m/Y', strtotime($filters['date_from'])) . ' a ' . date('d/m/Y', strtotime($filters['date_to']));
+        } else {
+            $periodLabel = 'Período personalizado';
+        }
+        break;
+    case 'all':
+        $periodLabel = 'Todas até ' . $horizonLabel;
+        break;
+    default:
+        if (!empty($filters['date_month']) && !empty($filters['date_year'])) {
+            $monthIdx = (int)$filters['date_month'];
+            $periodLabel = ($monthsPt[$monthIdx - 1] ?? '') . '/' . $filters['date_year'];
+        }
+        break;
+}
+
 // Parâmetros de ordenação (preservar após POST)
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $sortBy = $_POST['sort_by'] ?? $_GET['sort_by'] ?? 'due_date';
@@ -677,7 +709,7 @@ if ($action == 'list') {
                     <h2 class="text-xl font-semibold text-red-700">
                         <i class="fas fa-credit-card mr-2"></i>
                         Contas a Pagar
-                        <span class="text-sm font-normal text-gray-500 ml-2">(<?= $totalExpenses ?> contas)</span>
+                        <span class="text-sm font-normal text-gray-500 ml-2">(<?= $totalExpenses ?> contas • <?= $periodLabel ?>)</span>
                     </h2>
                     <div class="flex items-center space-x-4">
                         <div class="flex items-center">
@@ -902,7 +934,7 @@ if ($action == 'list') {
                     <h2 class="text-xl font-semibold text-green-700">
                         <i class="fas fa-money-bill-wave mr-2"></i>
                         Contas a Receber
-                        <span class="text-sm font-normal text-gray-500 ml-2">(<?= $totalRevenues ?> contas)</span>
+                        <span class="text-sm font-normal text-gray-500 ml-2">(<?= $totalRevenues ?> contas • <?= $periodLabel ?>)</span>
                     </h2>
                     <div class="flex items-center space-x-4">
                         <div class="flex items-center">
