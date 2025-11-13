@@ -625,15 +625,12 @@ if ($action == 'list') {
 
         <?php if ($action == 'list'): ?>
         <!-- Botões: Toggle de Visualização + Nova Conta -->
-        <div class="mb-6 flex justify-between items-center">
-                <div class="flex items-center gap-2">
-                    <a href="?<?= http_build_query(array_merge($_GET, ['view' => $viewMode === 'calendar' ? 'list' : 'calendar'])) ?>" 
-                       class="bg-secondary hover:bg-gray-700 text-white px-4 py-2 rounded-md transition-colors">
-                        <i class="fas <?= $viewMode === 'calendar' ? 'fa-list' : 'fa-calendar-alt' ?> mr-2"></i>
-                        <?= $viewMode === 'calendar' ? 'Lista' : 'Calendário' ?>
-                    </a>
-
-                </div>
+        <div class="mb-6 flex justify-end items-center">
+                <a href="?<?= http_build_query(array_merge($_GET, ['view' => $viewMode === 'calendar' ? 'list' : 'calendar'])) ?>" 
+                   class="bg-secondary hover:bg-gray-700 text-white px-4 py-2 rounded-md transition-colors mr-4">
+                    <i class="fas <?= $viewMode === 'calendar' ? 'fa-list' : 'fa-calendar-alt' ?> mr-2"></i>
+                    <?= $viewMode === 'calendar' ? 'Lista' : 'Calendário' ?>
+                </a>
                 <a href="?action=add" class="bg-primary hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors">
                     <i class="fas fa-plus mr-2"></i>
                     Nova Conta
