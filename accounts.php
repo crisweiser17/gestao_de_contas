@@ -481,6 +481,10 @@ if (!in_array(strtoupper($sortOrder), $validSortOrders)) {
 
 // Estado de visualização (lista/calendário)
 $viewMode = (isset($_GET['view']) && $_GET['view'] === 'calendar') ? 'calendar' : 'list';
+// Estado de agrupamento (none/categoria) separado por tabela
+$groupModeGlobal = (isset($_GET['group']) && $_GET['group'] === 'category') ? 'category' : 'none';
+$groupModeExpenses = isset($_GET['group_expenses']) ? (($_GET['group_expenses'] === 'category') ? 'category' : 'none') : $groupModeGlobal;
+$groupModeRevenues = isset($_GET['group_revenues']) ? (($_GET['group_revenues'] === 'category') ? 'category' : 'none') : $groupModeGlobal;
 
 // Parâmetros de paginação
 $itemsPerPageExpenses = (int)($_GET['items_per_page_expenses'] ?? 25);
@@ -509,6 +513,30 @@ if ($action == 'list') {
     $totalRevenues = $accountModel->countWithFilters($userId, $filtersRevenues);
     $offsetRevenues = ($pageRevenues - 1) * $itemsPerPageRevenues;
     $accountsRevenues = $accountModel->getWithFilters($userId, $filtersRevenues, $sortBy, $sortOrder, $itemsPerPageRevenues, $offsetRevenues);
+    
+    // Ordenação padrão por tabela (pendentes primeiro, depois vencimento), quando não há sort_by explícito
+    if (!isset($_GET['sort_by'])) {
+        // Despesas: pendente primeiro, depois paga; segundo critério due_date ASC
+        usort($accountsExpenses, function($a, $b) {
+            $prio = function($st){ return ($st === 'pendente') ? 0 : (($st === 'paga') ? 1 : 2); };
+            $pa = $prio($a['status'] ?? '');
+            $pb = $prio($b['status'] ?? '');
+            if ($pa !== $pb) return $pa <=> $pb;
+            $da = strtotime($a['due_date'] ?? '') ?: 0;
+            $db = strtotime($b['due_date'] ?? '') ?: 0;
+            return $da <=> $db;
+        });
+        // Receitas: pendente primeiro, depois recebida; segundo critério due_date ASC
+        usort($accountsRevenues, function($a, $b) {
+            $prio = function($st){ return ($st === 'pendente') ? 0 : (($st === 'recebida') ? 1 : 2); };
+            $pa = $prio($a['status'] ?? '');
+            $pb = $prio($b['status'] ?? '');
+            if ($pa !== $pb) return $pa <=> $pb;
+            $da = strtotime($a['due_date'] ?? '') ?: 0;
+            $db = strtotime($b['due_date'] ?? '') ?: 0;
+            return $da <=> $db;
+        });
+    }
     
     // Calcular total de páginas
     $totalPagesExpenses = ceil($totalExpenses / $itemsPerPageExpenses);
@@ -564,6 +592,13 @@ if ($action == 'list') {
             }
         }
     </script>
+    <script>
+        function toggleGroupMenu(type) {
+            var el = document.getElementById('group_menu_' + type);
+            if (!el) return;
+            el.classList.toggle('hidden');
+        }
+    </script>
 </head>
 <body class="bg-gray-50">
     <?php require_once 'partials/header.php'; render_header('accounts'); ?>
@@ -590,16 +625,19 @@ if ($action == 'list') {
         <?php if ($action == 'list'): ?>
         <!-- Botões: Toggle de Visualização + Nova Conta -->
         <div class="mb-6 flex justify-between items-center">
-            <a href="?<?= http_build_query(array_merge($_GET, ['view' => $viewMode === 'calendar' ? 'list' : 'calendar'])) ?>" 
-               class="bg-secondary hover:bg-gray-700 text-white px-4 py-2 rounded-md transition-colors">
-                <i class="fas <?= $viewMode === 'calendar' ? 'fa-list' : 'fa-calendar-alt' ?> mr-2"></i>
-                <?= $viewMode === 'calendar' ? 'Lista' : 'Calendário' ?>
-            </a>
-            <a href="?action=add" class="bg-primary hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors">
-                <i class="fas fa-plus mr-2"></i>
-                Nova Conta
-            </a>
-        </div>
+                <div class="flex items-center gap-2">
+                    <a href="?<?= http_build_query(array_merge($_GET, ['view' => $viewMode === 'calendar' ? 'list' : 'calendar'])) ?>" 
+                       class="bg-secondary hover:bg-gray-700 text-white px-4 py-2 rounded-md transition-colors">
+                        <i class="fas <?= $viewMode === 'calendar' ? 'fa-list' : 'fa-calendar-alt' ?> mr-2"></i>
+                        <?= $viewMode === 'calendar' ? 'Lista' : 'Calendário' ?>
+                    </a>
+
+                </div>
+                <a href="?action=add" class="bg-primary hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors">
+                    <i class="fas fa-plus mr-2"></i>
+                    Nova Conta
+                </a>
+            </div>
 
         <!-- Filtros Globais -->
         <div class="bg-white rounded-lg shadow mb-6">
@@ -610,6 +648,7 @@ if ($action == 'list') {
                 </h3>
                 <form method="GET">
                     <input type="hidden" name="action" value="list">
+<input type="hidden" name="view" value="<?= $viewMode ?>">
                     
                     <!-- Todos os filtros em uma linha -->
                     <div class="grid grid-cols-1 lg:grid-cols-6 gap-3 items-end">
@@ -862,6 +901,16 @@ if ($action == 'list') {
                     </h2>
                     <div class="flex items-center space-x-4">
                         <div class="flex items-center">
+                            <div class="relative mr-3">
+                                <button type="button" data-group-toggle="group_menu_expenses" onclick="toggleGroupMenu('expenses')" class="px-2 py-1 text-sm rounded bg-red-100 text-red-700 hover:bg-red-200">
+                                    <i class="fas fa-layer-group mr-1"></i>Agrupar
+                                </button>
+                                <div id="group_menu_expenses" class="absolute mt-1 bg-white border border-gray-200 rounded shadow text-sm hidden z-10 min-w-[180px]">
+                                    <a href="?<?= http_build_query(array_merge($_GET, ['group_expenses' => 'category'])) ?>" class="block px-3 py-2 hover:bg-gray-100">Por categoria</a>
+                                    <a href="?<?= http_build_query(array_merge($_GET, ['group_expenses' => 'status'])) ?>" class="block px-3 py-2 hover:bg-gray-100">Por status</a>
+                                    <a href="?<?= http_build_query(array_merge($_GET, ['group_expenses' => 'none'])) ?>" class="block px-3 py-2 hover:bg-gray-100">Desagrupar</a>
+                                </div>
+                            </div>
                             <label for="items_per_page_expenses" class="text-sm text-gray-600 mr-2">Itens por página:</label>
                             <select id="items_per_page_expenses" name="items_per_page_expenses" class="border border-gray-300 rounded px-2 py-1 text-sm" onchange="updatePagination('expenses')">
                                 <option value="25" <?= $itemsPerPageExpenses == 25 ? 'selected' : '' ?>>25</option>
@@ -937,6 +986,246 @@ if ($action == 'list') {
                                 <p>Nenhuma conta a pagar encontrada</p>
                             </td>
                         </tr>
+                        <?php else: ?>
+                        <?php if ($groupModeExpenses === 'category'): ?>
+                        <?php 
+                            $groupedExpenses = [];
+                            foreach ($accountsExpenses as $acc) {
+                                $cat = trim($acc['category_name'] ?? '') !== '' ? $acc['category_name'] : 'Sem categoria';
+                                if (!isset($groupedExpenses[$cat])) { $groupedExpenses[$cat] = []; }
+                                $groupedExpenses[$cat][] = $acc;
+                            }
+                        ?>
+                        <?php foreach ($groupedExpenses as $catName => $items): ?>
+                            <?php $subtotal = 0.0; foreach ($items as $it) { $subtotal += floatval($it['amount']); } ?>
+                            <tr class="bg-red-100">
+                                <td class="px-6 py-2 font-semibold text-red-700" colspan="3">
+                                    <i class="fas fa-folder-open mr-2"></i>
+                                    <?= htmlspecialchars($catName) ?>
+                                </td>
+                                <td class="px-6 py-2 text-right font-semibold text-red-700" colspan="4">
+                                    Subtotal: R$ <?= number_format($subtotal, 2, ',', '.') ?>
+                                </td>
+                            </tr>
+                            <?php foreach ($items as $account): ?>
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center">
+                                        <?php if (!empty($account['is_recurring']) || !empty($account['recurring_parent_id'])): ?>
+                                        <i class="fas fa-sync-alt text-blue-500 mr-2" title="Conta recorrente"></i>
+                                        <?php endif; ?>
+                                        <div>
+                                            <div class="text-sm font-medium text-gray-900 flex items-center">
+                                                <?= htmlspecialchars($account['description']) ?>
+                                                <?php if ($account['url']): ?>
+                                                <a href="<?= htmlspecialchars($account['url']) ?>" target="_blank" class="ml-2 text-blue-600 hover:text-blue-800" title="Abrir URL associada">
+                                                    <i class="fas fa-external-link-alt"></i>
+                                                </a>
+                                                <?php endif; ?>
+                                            </div>
+                                            <?php if (!empty($account['name'])): ?>
+                                                <div class="text-xs text-gray-500"><?= htmlspecialchars($account['name']) ?></div>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 text-sm text-gray-900"><?= htmlspecialchars($account['category_name']) ?></td>
+                                <td class="px-6 py-4 text-sm font-medium text-red-600">
+                                    <?= formatCurrency($account['amount']) ?>
+                                </td>
+                                <td class="px-6 py-4 text-sm text-gray-900"><?= formatDate($account['due_date']) ?></td>
+                                <td class="px-6 py-4">
+                                    <form method="POST" class="inline">
+                                        <input type="hidden" name="action" value="update_status">
+                                        <input type="hidden" name="id" value="<?= $account['id'] ?>">
+                                        <?php foreach ($filters as $key => $value): ?>
+                                            <?php if (!empty($value)): ?>
+                                            <input type="hidden" name="filter_<?= $key ?>" value="<?= htmlspecialchars($value) ?>">
+                                            <?php endif; ?>
+                                        <?php endforeach; ?>
+                                        <?php if (!empty($sortBy)): ?>
+                                        <input type="hidden" name="sort_by" value="<?= htmlspecialchars($sortBy) ?>">
+                                        <?php endif; ?>
+                                        <?php if (!empty($sortOrder)): ?>
+                                        <input type="hidden" name="sort_order" value="<?= htmlspecialchars($sortOrder) ?>">
+                                        <?php endif; ?>
+                                        <div class="flex items-center gap-1">
+                                            <select name="status" id="status_<?= $account['id'] ?>"
+                                                    class="text-xs px-2 py-1 rounded border-0 <?= 
+                                                        $account['status'] == 'paga' ? 'bg-green-100 text-green-800' : 
+                                                        ($account['status'] == 'pendente' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800') 
+                                                    ?>">
+                                                <option value="pendente" <?= $account['status'] == 'pendente' ? 'selected' : '' ?>>Pendente</option>
+                                                <option value="paga" <?= $account['status'] == 'paga' ? 'selected' : '' ?>>Paga</option>
+                                            </select>
+                                            <button type="submit" class="text-xs px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600">
+                                                ✓
+                                            </button>
+                                        </div>
+                                    </form>
+                                </td>
+                                <td class="px-6 py-4 text-sm">
+                                    <?php if (!empty($account['attachment'])): ?>
+                                        <?php 
+                                        $fileExtension = strtolower(pathinfo($account['attachment'], PATHINFO_EXTENSION));
+                                        $fileName = basename($account['attachment']);
+                                        ?>
+                                        <a href="javascript:void(0)" onclick="openLightbox('<?= htmlspecialchars($account['attachment']) ?>')" 
+                                           class="inline-flex items-center text-blue-600 hover:text-blue-800 text-xs">
+                                            <?php if ($fileExtension === 'pdf'): ?>
+                                                <i class="fas fa-file-pdf mr-1 text-red-500"></i>
+                                            <?php elseif (in_array($fileExtension, ['jpg', 'jpeg', 'png'])): ?>
+                                                <i class="fas fa-file-image mr-1 text-green-500"></i>
+                                            <?php else: ?>
+                                                <i class="fas fa-file mr-1 text-gray-500"></i>
+                                            <?php endif; ?>
+                                            Ver
+                                        </a>
+                                    <?php else: ?>
+                                        <span class="text-gray-400 text-xs">-</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="px-6 py-4 text-sm space-x-2">
+                                    <a href="?action=edit&id=<?= $account['id'] ?><?= (intval($account['is_recurring']) === 1 ? (empty($account['recurring_parent_id']) ? '&edit_context=parent' : '&edit_context=instance') : '') ?>" 
+                                       class="text-blue-600 hover:text-blue-800">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <form method="POST" class="inline" onsubmit="return confirm('Tem certeza que deseja excluir esta conta?')">
+                                        <input type="hidden" name="action" value="delete">
+                                        <input type="hidden" name="id" value="<?= $account['id'] ?>">
+                                        <button type="submit" class="text-red-600 hover:text-red-800">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        <?php endforeach; ?>
+                        <?php elseif ($groupModeExpenses === 'status'): ?>
+                        <?php 
+                            $groupedStatusExpenses = [];
+                            foreach ($accountsExpenses as $acc) {
+                                $st = $acc['status'] ?? '';
+                                $key = ($st === 'pendente') ? 'pendente' : (($st === 'paga') ? 'paga' : $st);
+                                if (!isset($groupedStatusExpenses[$key])) { $groupedStatusExpenses[$key] = []; }
+                                $groupedStatusExpenses[$key][] = $acc;
+                            }
+                            $statusOrderExpenses = ['pendente', 'paga'];
+                        ?>
+                        <?php foreach ($statusOrderExpenses as $stName): ?>
+                            <?php if (empty($groupedStatusExpenses[$stName])) continue; ?>
+                            <?php 
+                                $items = $groupedStatusExpenses[$stName]; 
+                                usort($items, function($a,$b){ 
+                                    $da = strtotime($a['due_date'] ?? '') ?: 0; 
+                                    $db = strtotime($b['due_date'] ?? '') ?: 0; 
+                                    return $da <=> $db; 
+                                }); 
+                                $subtotal = 0.0; foreach ($items as $it) { $subtotal += floatval($it['amount']); } 
+                            ?>
+                            <tr class="bg-red-100">
+                                <td class="px-6 py-2 font-semibold text-red-700" colspan="3">
+                                    <i class="fas fa-folder-open mr-2"></i>
+                                    <?= htmlspecialchars(ucfirst($stName)) ?>
+                                </td>
+                                <td class="px-6 py-2 text-right font-semibold text-red-700" colspan="4">
+                                    Subtotal: R$ <?= number_format($subtotal, 2, ',', '.') ?>
+                                </td>
+                            </tr>
+                            <?php foreach ($items as $account): ?>
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center">
+                                        <?php if (!empty($account['is_recurring']) || !empty($account['recurring_parent_id'])): ?>
+                                        <i class="fas fa-sync-alt text-blue-500 mr-2" title="Conta recorrente"></i>
+                                        <?php endif; ?>
+                                        <div>
+                                            <div class="text-sm font-medium text-gray-900 flex items-center">
+                                                <?= htmlspecialchars($account['description']) ?>
+                                                <?php if ($account['url']): ?>
+                                                <a href="<?= htmlspecialchars($account['url']) ?>" target="_blank" class="ml-2 text-blue-600 hover:text-blue-800" title="Abrir URL associada">
+                                                    <i class="fas fa-external-link-alt"></i>
+                                                </a>
+                                                <?php endif; ?>
+                                            </div>
+                                            <?php if (!empty($account['name'])): ?>
+                                                <div class="text-xs text-gray-500"><?= htmlspecialchars($account['name']) ?></div>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 text-sm text-gray-900"><?= htmlspecialchars($account['category_name']) ?></td>
+                                <td class="px-6 py-4 text-sm font-medium text-red-600">
+                                    <?= formatCurrency($account['amount']) ?>
+                                </td>
+                                <td class="px-6 py-4 text-sm text-gray-900"><?= formatDate($account['due_date']) ?></td>
+                                <td class="px-6 py-4">
+                                    <form method="POST" class="inline">
+                                        <input type="hidden" name="action" value="update_status">
+                                        <input type="hidden" name="id" value="<?= $account['id'] ?>">
+                                        <?php foreach ($filters as $key => $value): ?>
+                                            <?php if (!empty($value)): ?>
+                                            <input type="hidden" name="filter_<?= $key ?>" value="<?= htmlspecialchars($value) ?>">
+                                            <?php endif; ?>
+                                        <?php endforeach; ?>
+                                        <?php if (!empty($sortBy)): ?>
+                                        <input type="hidden" name="sort_by" value="<?= htmlspecialchars($sortBy) ?>">
+                                        <?php endif; ?>
+                                        <?php if (!empty($sortOrder)): ?>
+                                        <input type="hidden" name="sort_order" value="<?= htmlspecialchars($sortOrder) ?>">
+                                        <?php endif; ?>
+                                        <div class="flex items-center gap-1">
+                                            <select name="status" id="status_<?= $account['id'] ?>"
+                                                    class="text-xs px-2 py-1 rounded border-0 <?= 
+                                                        $account['status'] == 'paga' ? 'bg-green-100 text-green-800' : 
+                                                        ($account['status'] == 'pendente' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800') 
+                                                    ?>">
+                                                <option value="pendente" <?= $account['status'] == 'pendente' ? 'selected' : '' ?>>Pendente</option>
+                                                <option value="paga" <?= $account['status'] == 'paga' ? 'selected' : '' ?>>Paga</option>
+                                            </select>
+                                            <button type="submit" class="text-xs px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600">
+                                                ✓
+                                            </button>
+                                        </div>
+                                    </form>
+                                </td>
+                                <td class="px-6 py-4 text-sm">
+                                    <?php if (!empty($account['attachment'])): ?>
+                                        <?php 
+                                        $fileExtension = strtolower(pathinfo($account['attachment'], PATHINFO_EXTENSION));
+                                        $fileName = basename($account['attachment']);
+                                        ?>
+                                        <a href="javascript:void(0)" onclick="openLightbox('<?= htmlspecialchars($account['attachment']) ?>')" 
+                                           class="inline-flex items-center text-blue-600 hover:text-blue-800 text-xs">
+                                            <?php if ($fileExtension === 'pdf'): ?>
+                                                <i class="fas fa-file-pdf mr-1 text-red-500"></i>
+                                            <?php elseif (in_array($fileExtension, ['jpg', 'jpeg', 'png'])): ?>
+                                                <i class="fas fa-file-image mr-1 text-green-500"></i>
+                                            <?php else: ?>
+                                                <i class="fas fa-file mr-1 text-gray-500"></i>
+                                            <?php endif; ?>
+                                            Ver
+                                        </a>
+                                    <?php else: ?>
+                                        <span class="text-gray-400 text-xs">-</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="px-6 py-4 text-sm space-x-2">
+                                    <a href="?action=edit&id=<?= $account['id'] ?><?= (intval($account['is_recurring']) === 1 ? (empty($account['recurring_parent_id']) ? '&edit_context=parent' : '&edit_context=instance') : '') ?>" 
+                                       class="text-blue-600 hover:text-blue-800">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <form method="POST" class="inline" onsubmit="return confirm('Tem certeza que deseja excluir esta conta?')">
+                                        <input type="hidden" name="action" value="delete">
+                                        <input type="hidden" name="id" value="<?= $account['id'] ?>">
+                                        <button type="submit" class="text-red-600 hover:text-red-800">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        <?php endforeach; ?>
                         <?php else: ?>
                         <?php foreach ($accountsExpenses as $account): ?>
                         <tr class="hover:bg-gray-50">
@@ -1032,6 +1321,7 @@ if ($action == 'list') {
                         </tr>
                         <?php endforeach; ?>
                         <?php endif; ?>
+                        <?php endif; ?>
                         
                         <!-- Linha de Totais (única linha) -->
                         <tr class="bg-red-50 border-t-2 border-red-200 font-semibold">
@@ -1087,6 +1377,16 @@ if ($action == 'list') {
                     </h2>
                     <div class="flex items-center space-x-4">
                         <div class="flex items-center">
+                            <div class="relative mr-3">
+                                <button type="button" data-group-toggle="group_menu_revenues" onclick="toggleGroupMenu('revenues')" class="px-2 py-1 text-sm rounded bg-green-100 text-green-700 hover:bg-green-200">
+                                    <i class="fas fa-layer-group mr-1"></i>Agrupar
+                                </button>
+                                <div id="group_menu_revenues" class="absolute mt-1 bg-white border border-gray-200 rounded shadow text-sm hidden z-10 min-w-[180px]">
+                                    <a href="?<?= http_build_query(array_merge($_GET, ['group_revenues' => 'category'])) ?>" class="block px-3 py-2 hover:bg-gray-100">Por categoria</a>
+                                    <a href="?<?= http_build_query(array_merge($_GET, ['group_revenues' => 'status'])) ?>" class="block px-3 py-2 hover:bg-gray-100">Por status</a>
+                                    <a href="?<?= http_build_query(array_merge($_GET, ['group_revenues' => 'none'])) ?>" class="block px-3 py-2 hover:bg-gray-100">Desagrupar</a>
+                                </div>
+                            </div>
                             <label for="items_per_page_revenues" class="text-sm text-gray-600 mr-2">Itens por página:</label>
                             <select id="items_per_page_revenues" name="items_per_page_revenues" class="border border-gray-300 rounded px-2 py-1 text-sm" onchange="updatePagination('revenues')">
                                 <option value="25" <?= $itemsPerPageRevenues == 25 ? 'selected' : '' ?>>25</option>
@@ -1162,6 +1462,246 @@ if ($action == 'list') {
                                 <p>Nenhuma conta a receber encontrada</p>
                             </td>
                         </tr>
+                        <?php else: ?>
+                        <?php if ($groupModeRevenues === 'category'): ?>
+                        <?php 
+                            $groupedRevenues = [];
+                            foreach ($accountsRevenues as $acc) {
+                                $cat = trim($acc['category_name'] ?? '') !== '' ? $acc['category_name'] : 'Sem categoria';
+                                if (!isset($groupedRevenues[$cat])) { $groupedRevenues[$cat] = []; }
+                                $groupedRevenues[$cat][] = $acc;
+                            }
+                        ?>
+                        <?php foreach ($groupedRevenues as $catName => $items): ?>
+                            <?php $subtotal = 0.0; foreach ($items as $it) { $subtotal += floatval($it['amount']); } ?>
+                            <tr class="bg-green-100">
+                                <td class="px-6 py-2 font-semibold text-green-700" colspan="3">
+                                    <i class="fas fa-folder-open mr-2"></i>
+                                    <?= htmlspecialchars($catName) ?>
+                                </td>
+                                <td class="px-6 py-2 text-right font-semibold text-green-700" colspan="4">
+                                    Subtotal: R$ <?= number_format($subtotal, 2, ',', '.') ?>
+                                </td>
+                            </tr>
+                            <?php foreach ($items as $account): ?>
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center">
+                                        <?php if (!empty($account['is_recurring']) || !empty($account['recurring_parent_id'])): ?>
+                                        <i class="fas fa-sync-alt text-blue-500 mr-2" title="Conta recorrente"></i>
+                                        <?php endif; ?>
+                                        <div>
+                                            <div class="text-sm font-medium text-gray-900 flex items-center">
+                                                <?= htmlspecialchars($account['description']) ?>
+                                                <?php if ($account['url']): ?>
+                                                <a href="<?= htmlspecialchars($account['url']) ?>" target="_blank" class="ml-2 text-blue-600 hover:text-blue-800" title="Abrir URL associada">
+                                                    <i class="fas fa-external-link-alt"></i>
+                                                </a>
+                                                <?php endif; ?>
+                                            </div>
+                                            <?php if (!empty($account['name'])): ?>
+                                                <div class="text-xs text-gray-500"><?= htmlspecialchars($account['name']) ?></div>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 text-sm text-gray-900"><?= htmlspecialchars($account['category_name']) ?></td>
+                                <td class="px-6 py-4 text-sm font-medium text-green-600">
+                                    <?= formatCurrency($account['amount']) ?>
+                                </td>
+                                <td class="px-6 py-4 text-sm text-gray-900"><?= formatDate($account['due_date']) ?></td>
+                                <td class="px-6 py-4">
+                                    <form method="POST" class="inline">
+                                        <input type="hidden" name="action" value="update_status">
+                                        <input type="hidden" name="id" value="<?= $account['id'] ?>">
+                                        <?php foreach ($filters as $key => $value): ?>
+                                            <?php if (!empty($value)): ?>
+                                            <input type="hidden" name="filter_<?= $key ?>" value="<?= htmlspecialchars($value) ?>">
+                                            <?php endif; ?>
+                                        <?php endforeach; ?>
+                                        <?php if (!empty($sortBy)): ?>
+                                        <input type="hidden" name="sort_by" value="<?= htmlspecialchars($sortBy) ?>">
+                                        <?php endif; ?>
+                                        <?php if (!empty($sortOrder)): ?>
+                                        <input type="hidden" name="sort_order" value="<?= htmlspecialchars($sortOrder) ?>">
+                                        <?php endif; ?>
+                                        <div class="flex items-center gap-1">
+                                            <select name="status" id="status_<?= $account['id'] ?>"
+                                                    class="text-xs px-2 py-1 rounded border-0 <?= 
+                                                        $account['status'] == 'recebida' ? 'bg-green-100 text-green-800' : 
+                                                        ($account['status'] == 'pendente' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800') 
+                                                    ?>">
+                                                <option value="pendente" <?= $account['status'] == 'pendente' ? 'selected' : '' ?>>Pendente</option>
+                                                <option value="recebida" <?= $account['status'] == 'recebida' ? 'selected' : '' ?>>Recebida</option>
+                                            </select>
+                                            <button type="submit" class="text-xs px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600">
+                                                ✓
+                                            </button>
+                                        </div>
+                                    </form>
+                                </td>
+                                <td class="px-6 py-4 text-sm">
+                                    <?php if (!empty($account['attachment'])): ?>
+                                        <?php 
+                                        $fileExtension = strtolower(pathinfo($account['attachment'], PATHINFO_EXTENSION));
+                                        $fileName = basename($account['attachment']);
+                                        ?>
+                                        <a href="javascript:void(0)" onclick="openLightbox('<?= htmlspecialchars($account['attachment']) ?>')" 
+                                           class="inline-flex items-center text-blue-600 hover:text-blue-800 text-xs">
+                                            <?php if ($fileExtension === 'pdf'): ?>
+                                                <i class="fas fa-file-pdf mr-1 text-red-500"></i>
+                                            <?php elseif (in_array($fileExtension, ['jpg', 'jpeg', 'png'])): ?>
+                                                <i class="fas fa-file-image mr-1 text-green-500"></i>
+                                            <?php else: ?>
+                                                <i class="fas fa-file mr-1 text-gray-500"></i>
+                                            <?php endif; ?>
+                                            Ver
+                                        </a>
+                                    <?php else: ?>
+                                        <span class="text-gray-400 text-xs">-</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="px-6 py-4 text-sm space-x-2">
+                                    <a href="?action=edit&id=<?= $account['id'] ?><?= (intval($account['is_recurring']) === 1 ? (empty($account['recurring_parent_id']) ? '&edit_context=parent' : '&edit_context=instance') : '') ?>" 
+                                       class="text-blue-600 hover:text-blue-800">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <form method="POST" class="inline" onsubmit="return confirm('Tem certeza que deseja excluir esta conta?')">
+                                        <input type="hidden" name="action" value="delete">
+                                        <input type="hidden" name="id" value="<?= $account['id'] ?>">
+                                        <button type="submit" class="text-red-600 hover:text-red-800">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        <?php endforeach; ?>
+                        <?php elseif ($groupModeRevenues === 'status'): ?>
+                        <?php 
+                            $groupedStatusRevenues = [];
+                            foreach ($accountsRevenues as $acc) {
+                                $st = $acc['status'] ?? '';
+                                $key = ($st === 'pendente') ? 'pendente' : (($st === 'recebida') ? 'recebida' : $st);
+                                if (!isset($groupedStatusRevenues[$key])) { $groupedStatusRevenues[$key] = []; }
+                                $groupedStatusRevenues[$key][] = $acc;
+                            }
+                            $statusOrderRevenues = ['pendente', 'recebida'];
+                        ?>
+                        <?php foreach ($statusOrderRevenues as $stName): ?>
+                            <?php if (empty($groupedStatusRevenues[$stName])) continue; ?>
+                            <?php 
+                                $items = $groupedStatusRevenues[$stName]; 
+                                usort($items, function($a,$b){ 
+                                    $da = strtotime($a['due_date'] ?? '') ?: 0; 
+                                    $db = strtotime($b['due_date'] ?? '') ?: 0; 
+                                    return $da <=> $db; 
+                                }); 
+                                $subtotal = 0.0; foreach ($items as $it) { $subtotal += floatval($it['amount']); } 
+                            ?>
+                            <tr class="bg-green-100">
+                                <td class="px-6 py-2 font-semibold text-green-700" colspan="3">
+                                    <i class="fas fa-folder-open mr-2"></i>
+                                    <?= htmlspecialchars(ucfirst($stName)) ?>
+                                </td>
+                                <td class="px-6 py-2 text-right font-semibold text-green-700" colspan="4">
+                                    Subtotal: R$ <?= number_format($subtotal, 2, ',', '.') ?>
+                                </td>
+                            </tr>
+                            <?php foreach ($items as $account): ?>
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center">
+                                        <?php if (!empty($account['is_recurring']) || !empty($account['recurring_parent_id'])): ?>
+                                        <i class="fas fa-sync-alt text-blue-500 mr-2" title="Conta recorrente"></i>
+                                        <?php endif; ?>
+                                        <div>
+                                            <div class="text-sm font-medium text-gray-900 flex items-center">
+                                                <?= htmlspecialchars($account['description']) ?>
+                                                <?php if ($account['url']): ?>
+                                                <a href="<?= htmlspecialchars($account['url']) ?>" target="_blank" class="ml-2 text-blue-600 hover:text-blue-800" title="Abrir URL associada">
+                                                    <i class="fas fa-external-link-alt"></i>
+                                                </a>
+                                                <?php endif; ?>
+                                            </div>
+                                            <?php if (!empty($account['name'])): ?>
+                                                <div class="text-xs text-gray-500"><?= htmlspecialchars($account['name']) ?></div>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 text-sm text-gray-900"><?= htmlspecialchars($account['category_name']) ?></td>
+                                <td class="px-6 py-4 text-sm font-medium text-green-600">
+                                    <?= formatCurrency($account['amount']) ?>
+                                </td>
+                                <td class="px-6 py-4 text-sm text-gray-900"><?= formatDate($account['due_date']) ?></td>
+                                <td class="px-6 py-4">
+                                    <form method="POST" class="inline">
+                                        <input type="hidden" name="action" value="update_status">
+                                        <input type="hidden" name="id" value="<?= $account['id'] ?>">
+                                        <?php foreach ($filters as $key => $value): ?>
+                                            <?php if (!empty($value)): ?>
+                                            <input type="hidden" name="filter_<?= $key ?>" value="<?= htmlspecialchars($value) ?>">
+                                            <?php endif; ?>
+                                        <?php endforeach; ?>
+                                        <?php if (!empty($sortBy)): ?>
+                                        <input type="hidden" name="sort_by" value="<?= htmlspecialchars($sortBy) ?>">
+                                        <?php endif; ?>
+                                        <?php if (!empty($sortOrder)): ?>
+                                        <input type="hidden" name="sort_order" value="<?= htmlspecialchars($sortOrder) ?>">
+                                        <?php endif; ?>
+                                        <div class="flex items-center gap-1">
+                                            <select name="status" id="status_<?= $account['id'] ?>"
+                                                    class="text-xs px-2 py-1 rounded border-0 <?= 
+                                                        $account['status'] == 'recebida' ? 'bg-green-100 text-green-800' : 
+                                                        ($account['status'] == 'pendente' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800') 
+                                                    ?>">
+                                                <option value="pendente" <?= $account['status'] == 'pendente' ? 'selected' : '' ?>>Pendente</option>
+                                                <option value="recebida" <?= $account['status'] == 'recebida' ? 'selected' : '' ?>>Recebida</option>
+                                            </select>
+                                            <button type="submit" class="text-xs px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600">
+                                                ✓
+                                            </button>
+                                        </div>
+                                    </form>
+                                </td>
+                                <td class="px-6 py-4 text-sm">
+                                    <?php if (!empty($account['attachment'])): ?>
+                                        <?php 
+                                        $fileExtension = strtolower(pathinfo($account['attachment'], PATHINFO_EXTENSION));
+                                        $fileName = basename($account['attachment']);
+                                        ?>
+                                        <a href="javascript:void(0)" onclick="openLightbox('<?= htmlspecialchars($account['attachment']) ?>')" 
+                                           class="inline-flex items-center text-blue-600 hover:text-blue-800 text-xs">
+                                            <?php if ($fileExtension === 'pdf'): ?>
+                                                <i class="fas fa-file-pdf mr-1 text-red-500"></i>
+                                            <?php elseif (in_array($fileExtension, ['jpg', 'jpeg', 'png'])): ?>
+                                                <i class="fas fa-file-image mr-1 text-green-500"></i>
+                                            <?php else: ?>
+                                                <i class="fas fa-file mr-1 text-gray-500"></i>
+                                            <?php endif; ?>
+                                            Ver
+                                        </a>
+                                    <?php else: ?>
+                                        <span class="text-gray-400 text-xs">-</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="px-6 py-4 text-sm space-x-2">
+                                    <a href="?action=edit&id=<?= $account['id'] ?><?= (intval($account['is_recurring']) === 1 ? (empty($account['recurring_parent_id']) ? '&edit_context=parent' : '&edit_context=instance') : '') ?>" 
+                                       class="text-blue-600 hover:text-blue-800">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <form method="POST" class="inline" onsubmit="return confirm('Tem certeza que deseja excluir esta conta?')">
+                                        <input type="hidden" name="action" value="delete">
+                                        <input type="hidden" name="id" value="<?= $account['id'] ?>">
+                                        <button type="submit" class="text-red-600 hover:text-red-800">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        <?php endforeach; ?>
                         <?php else: ?>
                         <?php foreach ($accountsRevenues as $account): ?>
                         <tr class="hover:bg-gray-50">
@@ -1257,6 +1797,7 @@ if ($action == 'list') {
                         </tr>
                         <?php endforeach; ?>
                         <?php endif; ?>
+                        <?php endif; ?>
                         
                         <!-- Linha de Totais (única linha) -->
                         <tr class="bg-green-50 border-t-2 border-green-200 font-semibold">
@@ -1302,7 +1843,8 @@ if ($action == 'list') {
         </div>
 
         <?php endif; ?>
-        <?php else: ?>
+<?php endif; ?>
+<?php if ($action != 'list'): ?>
         <!-- Formulário de Adicionar/Editar -->
         <div class="bg-white rounded-lg shadow">
             <div class="p-6 border-b border-gray-200">
