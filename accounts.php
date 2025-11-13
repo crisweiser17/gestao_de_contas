@@ -1347,7 +1347,7 @@ if ($action == 'list') {
                                     </div>
                                     <div class="flex items-center text-red-700">
                                         <i class="fas fa-calculator mr-2"></i>
-                                        <span class="mr-2">Geral</span>
+                                        <span class="mr-2">Total</span>
                                         <span class="font-bold text-lg">R$ <?= number_format($totalAmountExpenses, 2, ',', '.') ?></span>
                                         <?php if ($totalExpenses > $itemsPerPageExpenses): ?>
                                         <span class="ml-2 text-xs bg-red-100 text-red-600 px-2 py-1 rounded-full cursor-help" 
@@ -1823,7 +1823,7 @@ if ($action == 'list') {
                                     </div>
                                     <div class="flex items-center text-green-700">
                                         <i class="fas fa-calculator mr-2"></i>
-                                        <span class="mr-2">Geral</span>
+                                        <span class="mr-2">Total</span>
                                         <span class="font-bold text-lg">R$ <?= number_format($totalAmountRevenues, 2, ',', '.') ?></span>
                                         <?php if ($totalRevenues > $itemsPerPageRevenues): ?>
                                         <span class="ml-2 text-xs bg-green-100 text-green-600 px-2 py-1 rounded-full cursor-help" 
