@@ -481,10 +481,11 @@ if (!in_array(strtoupper($sortOrder), $validSortOrders)) {
 
 // Estado de visualização (lista/calendário)
 $viewMode = (isset($_GET['view']) && $_GET['view'] === 'calendar') ? 'calendar' : 'list';
-// Estado de agrupamento (none/categoria) separado por tabela
-$groupModeGlobal = (isset($_GET['group']) && $_GET['group'] === 'category') ? 'category' : 'none';
-$groupModeExpenses = isset($_GET['group_expenses']) ? (($_GET['group_expenses'] === 'category') ? 'category' : 'none') : $groupModeGlobal;
-$groupModeRevenues = isset($_GET['group_revenues']) ? (($_GET['group_revenues'] === 'category') ? 'category' : 'none') : $groupModeGlobal;
+// Estado de agrupamento (none/category/status) separado por tabela
+$allowedGroupModes = ['none','category','status'];
+$groupModeGlobal = (isset($_GET['group']) && in_array($_GET['group'], $allowedGroupModes)) ? $_GET['group'] : 'none';
+$groupModeExpenses = (isset($_GET['group_expenses']) && in_array($_GET['group_expenses'], $allowedGroupModes)) ? $_GET['group_expenses'] : $groupModeGlobal;
+$groupModeRevenues = (isset($_GET['group_revenues']) && in_array($_GET['group_revenues'], $allowedGroupModes)) ? $_GET['group_revenues'] : $groupModeGlobal;
 
 // Parâmetros de paginação
 $itemsPerPageExpenses = (int)($_GET['items_per_page_expenses'] ?? 25);
