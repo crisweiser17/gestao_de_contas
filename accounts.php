@@ -479,6 +479,9 @@ if (!in_array(strtoupper($sortOrder), $validSortOrders)) {
     $sortOrder = 'ASC';
 }
 
+// Estado de visualização (lista/calendário)
+$viewMode = (isset($_GET['view']) && $_GET['view'] === 'calendar') ? 'calendar' : 'list';
+
 // Parâmetros de paginação
 $itemsPerPageExpenses = (int)($_GET['items_per_page_expenses'] ?? 25);
 $itemsPerPageRevenues = (int)($_GET['items_per_page_revenues'] ?? 25);
@@ -585,8 +588,13 @@ if ($action == 'list') {
         <?php endif; ?>
 
         <?php if ($action == 'list'): ?>
-        <!-- Botão Nova Conta -->
-        <div class="mb-6 flex justify-end">
+        <!-- Botões: Toggle de Visualização + Nova Conta -->
+        <div class="mb-6 flex justify-between items-center">
+            <a href="?<?= http_build_query(array_merge($_GET, ['view' => $viewMode === 'calendar' ? 'list' : 'calendar'])) ?>" 
+               class="bg-secondary hover:bg-gray-700 text-white px-4 py-2 rounded-md transition-colors">
+                <i class="fas <?= $viewMode === 'calendar' ? 'fa-list' : 'fa-calendar-alt' ?> mr-2"></i>
+                <?= $viewMode === 'calendar' ? 'Lista' : 'Calendário' ?>
+            </a>
             <a href="?action=add" class="bg-primary hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors">
                 <i class="fas fa-plus mr-2"></i>
                 Nova Conta
@@ -702,6 +710,147 @@ if ($action == 'list') {
             </div>
         </div>
 
+        <?php if ($viewMode === 'calendar'): ?>
+        <?php
+        // Parâmetros do calendário
+        $calendarYear = (int)($filters['date_year'] ?? date('Y'));
+        $calendarMonth = (int)($filters['date_month'] ?? date('n'));
+        $filterType = $filters['date_filter_type'] ?? '';
+        if ($filterType === 'custom' && !empty($filters['date_from'])) {
+            $calendarYear = (int)date('Y', strtotime($filters['date_from']));
+            $calendarMonth = (int)date('n', strtotime($filters['date_from']));
+        }
+        if ($filterType === 'all' || $filterType === 'year') {
+            $calendarYear = (int)date('Y');
+            $calendarMonth = (int)date('n');
+        }
+        $firstDayOfMonth = strtotime(sprintf('%04d-%02d-01', $calendarYear, $calendarMonth));
+        $daysInMonth = (int)date('t', $firstDayOfMonth);
+        $startWeekday = (int)date('w', $firstDayOfMonth); // 0=Domingo
+        $monthLabelCal = ($monthsPt[$calendarMonth - 1] ?? date('M')) . '/' . $calendarYear;
+        
+        // Agrupar contas por data
+        $accountsAll = array_merge($accountsExpenses ?? [], $accountsRevenues ?? []);
+        $accountsByDate = [];
+        foreach ($accountsAll as $acc) {
+            $d = $acc['due_date'];
+            if ((int)date('Y', strtotime($d)) === $calendarYear && (int)date('n', strtotime($d)) === $calendarMonth) {
+                if (!isset($accountsByDate[$d])) $accountsByDate[$d] = [];
+                $accountsByDate[$d][] = $acc;
+            }
+        }
+        ?>
+        <div class="bg-white rounded-lg shadow mb-6">
+            <div class="p-6 border-b border-gray-200 flex items-center justify-between">
+                <h2 class="text-xl font-semibold text-gray-900">
+                    <i class="fas fa-calendar-alt mr-2"></i> Calendário de Contas
+                    <span class="text-sm font-normal text-gray-500 ml-2">(<?= htmlspecialchars($monthLabelCal) ?>)</span>
+                </h2>
+                <div class="text-sm text-gray-600">Legenda:
+                    <span class="inline-flex items-center ml-2"><span class="w-2 h-2 bg-red-500 rounded-full mr-1"></span> Pagar</span>
+                    <span class="inline-flex items-center ml-3"><span class="w-2 h-2 bg-green-500 rounded-full mr-1"></span> Receber</span>
+                </div>
+            </div>
+            <div class="p-4">
+                <div class="grid grid-cols-7 gap-2">
+                    <?php
+                    // Cabeçalhos dos dias da semana
+                    $weekdays = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+                    foreach ($weekdays as $w) {
+                        echo '<div class="text-xs font-semibold text-gray-500 text-center">'.$w.'</div>';
+                    }
+                    // Células vazias antes do primeiro dia
+                    for ($i = 0; $i < $startWeekday; $i++) {
+                        echo '<div class="min-h-[100px] bg-gray-50 rounded border border-gray-200"></div>';
+                    }
+                    for ($day = 1; $day <= $daysInMonth; $day++) {
+                        $dateStr = sprintf('%04d-%02d-%02d', $calendarYear, $calendarMonth, $day);
+                        $items = $accountsByDate[$dateStr] ?? [];
+                        echo '<div class="min-h-[120px] bg-white rounded border border-gray-200 p-2">';
+                        echo '<div class="text-xs text-gray-500 mb-1">'. $day .'</div>';
+                        if (empty($items)) {
+                            echo '<div class="text-xs text-gray-300">—</div>';
+                        } else {
+                            foreach ($items as $acc) {
+                                $isReceita = (($acc['type'] ?? '') === 'receita');
+                                $colorClass = $isReceita ? 'text-green-700' : 'text-red-700';
+                                $bgClass = $isReceita ? 'bg-green-50' : 'bg-red-50';
+                                $statusLabel = htmlspecialchars($acc['status'] ?? '');
+                                $desc = htmlspecialchars($acc['description'] ?? '');
+                                $cat = htmlspecialchars($acc['category_name'] ?? '');
+                                $val = formatCurrency($acc['amount'] ?? 0);
+                                $due = formatDate($acc['due_date'] ?? $dateStr);
+                                $id = (int)($acc['id'] ?? 0);
+                                $attachment = htmlspecialchars($acc['attachment'] ?? '');
+                                $isRecurring = !empty($acc['is_recurring']) || !empty($acc['recurring_parent_id']);
+                                echo '<button class="w-full text-left text-xs '.$colorClass.' '.$bgClass.' rounded px-2 py-1 mb-1 hover:opacity-80 calendar-item" ' .
+                                     'data-id="'.$id.'" data-description="'.$desc.'" data-category="'.$cat.'" data-amount="'.$val.'" data-due="'.$due.'" ' .
+                                     'data-status="'.$statusLabel.'" data-attachment="'.$attachment.'" data-type="'.($isReceita ? 'receber' : 'pagar').'">' .
+                                     ($isRecurring ? '<i class=\'fas fa-sync-alt mr-1\' title=\'Conta recorrente\'></i>' : '') .
+                                     $desc.' • '.$val .
+                                     '</button>';
+                            }
+                        }
+                        echo '</div>';
+                    }
+                    ?>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal de Detalhes do Calendário -->
+        <div id="calendarItemModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+            <div class="bg-white rounded-lg shadow-lg w-full max-w-lg">
+                <div class="p-4 border-b flex items-center justify-between">
+                    <h3 class="text-lg font-semibold">Detalhes da Conta</h3>
+                    <button class="text-gray-500 hover:text-gray-700" onclick="closeCalendarModal()"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="p-4 space-y-3">
+                    <div class="text-sm"><span class="font-semibold">Descrição:</span> <span id="cal_desc"></span></div>
+                    <div class="text-sm"><span class="font-semibold">Categoria:</span> <span id="cal_cat"></span></div>
+                    <div class="text-sm"><span class="font-semibold">Valor:</span> <span id="cal_val"></span></div>
+                    <div class="text-sm"><span class="font-semibold">Vencimento:</span> <span id="cal_due"></span></div>
+                    <div class="text-sm"><span class="font-semibold">Status:</span> <span id="cal_status"></span></div>
+                    <div class="text-sm"><span class="font-semibold">Comprovante:</span> <span id="cal_att"></span></div>
+                    <div class="text-sm"><span class="font-semibold">Ações:</span>
+                        <div class="mt-2 flex items-center gap-3">
+                            <a id="cal_edit" href="#" class="text-blue-600 hover:text-blue-800"><i class="fas fa-edit"></i> Editar</a>
+                            <form id="cal_delete_form" method="POST" onsubmit="return confirm('Tem certeza que deseja excluir esta conta?')">
+                                <input type="hidden" name="action" value="delete">
+                                <input type="hidden" name="id" id="cal_delete_id" value="">
+                                <button type="submit" class="text-red-600 hover:text-red-800"><i class="fas fa-trash"></i> Excluir</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script>
+        document.addEventListener('click', function(e){
+          const btn = e.target.closest('.calendar-item');
+          if (!btn) return;
+          const modal = document.getElementById('calendarItemModal');
+          document.getElementById('cal_desc').textContent = btn.dataset.description || '';
+          document.getElementById('cal_cat').textContent = btn.dataset.category || '';
+          document.getElementById('cal_val').textContent = btn.dataset.amount || '';
+          document.getElementById('cal_due').textContent = btn.dataset.due || '';
+          document.getElementById('cal_status').textContent = btn.dataset.status || '';
+          const att = btn.dataset.attachment || '';
+          const attSpan = document.getElementById('cal_att');
+          attSpan.innerHTML = att ? ('<a href="'+att+'" target="_blank" class="text-blue-600 hover:text-blue-800">Ver</a>') : '<span class="text-gray-400">-</span>';
+          const id = btn.dataset.id || '';
+          document.getElementById('cal_delete_id').value = id;
+          document.getElementById('cal_edit').href = '?action=edit&id=' + id;
+          modal.classList.remove('hidden');
+          modal.classList.add('flex');
+        });
+        function closeCalendarModal(){
+          const modal = document.getElementById('calendarItemModal');
+          modal.classList.add('hidden');
+          modal.classList.remove('flex');
+        }
+        </script>
+        <?php else: ?>
         <!-- Contas a Pagar -->
         <div class="bg-white rounded-lg shadow mb-6">
             <div class="p-6 border-b border-gray-200">
@@ -1152,6 +1301,7 @@ if ($action == 'list') {
             </div>
         </div>
 
+        <?php endif; ?>
         <?php else: ?>
         <!-- Formulário de Adicionar/Editar -->
         <div class="bg-white rounded-lg shadow">
