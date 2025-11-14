@@ -18,6 +18,30 @@ $userId = $_SESSION['user_id'];
 $message = '';
 $messageType = '';
 
+// Endpoint JSON: listar instâncias de uma recorrência com paginação
+if (($_GET['action'] ?? '') === 'list_instances' && isset($_GET['parent_id'])) {
+    header('Content-Type: application/json');
+    $parentId = intval($_GET['parent_id']);
+    $page = max(1, intval($_GET['page'] ?? 1));
+    $limit = max(1, min(20, intval($_GET['limit'] ?? 10)));
+    $offset = ($page - 1) * $limit;
+
+    $conn = $recurringModel->getConnection();
+    $stmt = $conn->prepare("SELECT SQL_CALC_FOUND_ROWS id, description, amount, due_date, status FROM accounts WHERE recurring_parent_id = :parent_id AND user_id = :user_id ORDER BY due_date ASC LIMIT :limit OFFSET :offset");
+    $stmt->bindValue(':parent_id', $parentId, PDO::PARAM_INT);
+    $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
+    $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+    $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+    $stmt->execute();
+    $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $totalStmt = $conn->query("SELECT FOUND_ROWS() AS total");
+    $total = (int)($totalStmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0);
+
+    echo json_encode(['items' => $items, 'page' => $page, 'limit' => $limit, 'total' => $total]);
+    exit;
+}
+
 // Executar manutenção leve das contas recorrentes (em background)
 try {
     $recurringModel->lightMaintenance($userId);
@@ -333,6 +357,9 @@ $needsProcessing = array_filter($accountsNeedingGeneration, function($account) u
                             </td>
                             <td class="px-6 py-4 text-sm font-medium">
                                 <div class="flex space-x-2">
+                                    <button onclick="openInstancesModal(<?= $account['id'] ?>)" class="text-gray-600 hover:text-gray-900" title="Ver parcelas">
+                                        <i class="fas fa-list-ul"></i>
+                                    </button>
                                     <button onclick="openEditModal(<?= $account['id'] ?>)" 
                                        class="text-blue-600 hover:text-blue-900">
                                         <i class="fas fa-edit"></i>
@@ -474,6 +501,9 @@ $needsProcessing = array_filter($accountsNeedingGeneration, function($account) u
                             </td>
                             <td class="px-6 py-4 text-sm font-medium">
                                 <div class="flex space-x-2">
+                                    <button onclick="openInstancesModal(<?= $account['id'] ?>)" class="text-gray-600 hover:text-gray-900" title="Ver parcelas">
+                                        <i class="fas fa-list-ul"></i>
+                                    </button>
                                     <button onclick="openEditModal(<?= $account['id'] ?>)" 
                                        class="text-blue-600 hover:text-blue-900">
                                         <i class="fas fa-edit"></i>
@@ -532,9 +562,115 @@ $needsProcessing = array_filter($accountsNeedingGeneration, function($account) u
         <?php endif; ?>
     </main>
 
+    <!-- Modal de Instâncias -->
+    <div id="instancesModal" class="fixed inset-0 bg-black bg-opacity-40 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-lg w-full max-w-2xl">
+            <div class="px-6 py-4 border-b flex items-center justify-between">
+                <h3 class="text-lg font-semibold">Instâncias da recorrência</h3>
+                <button onclick="closeInstancesModal()" class="text-gray-600 hover:text-gray-900"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="instancesContent" class="p-6">
+                <div class="text-center text-gray-500">Carregando...</div>
+            </div>
+            <div class="px-6 py-4 border-t flex items-center justify-between">
+                <div id="instancesInfo" class="text-sm text-gray-600"></div>
+                <div class="space-x-2">
+                    <button id="prevPageBtn" class="px-3 py-1 border rounded disabled:opacity-50">Anterior</button>
+                    <button id="nextPageBtn" class="px-3 py-1 border rounded disabled:opacity-50">Próximo</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
+        let currentParentId = null;
+        let currentPage = 1;
+        let totalItems = 0;
+        let pageLimit = 10;
+
         function openEditModal(accountId) {
             window.location.href = 'accounts.php?action=edit&id=' + accountId + '&edit_context=parent';
+        }
+
+        function openInstancesModal(parentId) {
+            currentParentId = parentId;
+            currentPage = 1;
+            document.getElementById('instancesModal').classList.remove('hidden');
+            document.getElementById('instancesModal').classList.add('flex');
+            loadInstancesPage(currentPage);
+        }
+
+        function closeInstancesModal() {
+            document.getElementById('instancesModal').classList.add('hidden');
+            document.getElementById('instancesModal').classList.remove('flex');
+        }
+
+        async function loadInstancesPage(page) {
+            const content = document.getElementById('instancesContent');
+            const info = document.getElementById('instancesInfo');
+            const prevBtn = document.getElementById('prevPageBtn');
+            const nextBtn = document.getElementById('nextPageBtn');
+
+            content.innerHTML = '<div class="text-center text-gray-500">Carregando...</div>';
+
+            try {
+                const resp = await fetch(`recurring.php?action=list_instances&parent_id=${currentParentId}&page=${page}&limit=${pageLimit}`);
+                const data = await resp.json();
+
+                totalItems = data.total || 0;
+                currentPage = data.page || 1;
+
+                if (!data.items || data.items.length === 0) {
+                    content.innerHTML = '<div class="text-center text-gray-500">Nenhuma instância encontrada.</div>';
+                    info.textContent = '';
+                    prevBtn.disabled = true;
+                    nextBtn.disabled = true;
+                    return;
+                }
+
+                const rows = data.items.map(item => {
+                    const amount = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parseFloat(item.amount));
+                    const dt = new Date(item.due_date + 'T00:00:00');
+                    const due = dt.toLocaleDateString('pt-BR');
+                    const statusBadge = item.status === 'pendente'
+                        ? '<span class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs">Pendente</span>'
+                        : '<span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">' + (item.status === 'paga' ? 'Paga' : 'Recebida') + '</span>';
+                    return `<tr>
+                        <td class="px-4 py-2 text-sm text-gray-900">${item.description}</td>
+                        <td class="px-4 py-2 text-sm text-gray-900">${due}</td>
+                        <td class="px-4 py-2 text-sm">${amount}</td>
+                        <td class="px-4 py-2 text-sm">${statusBadge}</td>
+                    </tr>`;
+                }).join('');
+
+                content.innerHTML = `
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Vencimento</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Valor</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">${rows}</tbody>
+                    </table>
+                `;
+
+                const totalPages = Math.ceil(totalItems / pageLimit);
+                info.textContent = `Página ${currentPage} de ${totalPages} • ${totalItems} instância(s)`;
+                prevBtn.disabled = currentPage <= 1;
+                nextBtn.disabled = currentPage >= totalPages;
+
+                prevBtn.onclick = () => { if (currentPage > 1) loadInstancesPage(currentPage - 1); };
+                nextBtn.onclick = () => { const tp = Math.ceil(totalItems / pageLimit); if (currentPage < tp) loadInstancesPage(currentPage + 1); };
+
+            } catch (e) {
+                content.innerHTML = `<div class="text-center text-red-600">Erro ao carregar instâncias: ${e.message}</div>`;
+                info.textContent = '';
+                prevBtn.disabled = true;
+                nextBtn.disabled = true;
+            }
         }
     </script>
 </body>
