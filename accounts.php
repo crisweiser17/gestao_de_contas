@@ -1122,7 +1122,14 @@ if ($action == 'list') {
                                     <?php
                                         $parentId = !empty($account['recurring_parent_id']) ? $account['recurring_parent_id'] : (intval($account['is_recurring']) === 1 ? $account['id'] : null);
                                         if (!$parentId) {
-                                            $stmtFindParent = $pdo->prepare("SELECT id FROM accounts WHERE user_id = :uid AND description = :desc AND is_recurring = 1 ORDER BY id DESC LIMIT 1");
+                                            $stmtFindParent = $pdo->prepare("SELECT a.id
+                                                FROM accounts a
+                                                LEFT JOIN recurring_settings rs ON rs.account_id = a.id
+                                                WHERE a.user_id = :uid AND a.description = :desc AND a.is_recurring = 1
+                                                ORDER BY 
+                                                  CASE WHEN ((rs.max_occurrences IS NULL OR rs.max_occurrences = 0) AND (rs.end_date IS NULL OR CAST(rs.end_date AS CHAR(10)) = '0000-00-00')) THEN 0 ELSE 1 END ASC,
+                                                  a.id DESC
+                                                LIMIT 1");
                                             $stmtFindParent->execute([':uid' => $userId, ':desc' => $account['description']]);
                                             $rowParent = $stmtFindParent->fetch(PDO::FETCH_ASSOC);
                                             $parentId = $rowParent['id'] ?? null;
@@ -1133,7 +1140,10 @@ if ($action == 'list') {
                                       $maxOccurrences = intval($recSet['max_occurrences'] ?? 0);
                                       $endDate = $recSet['end_date'] ?? null;
                                       $noEnd = empty($endDate) || $endDate === '0000-00-00';
-                                      if ((!$recSet) || (($maxOccurrences <= 0) && $noEnd)) {
+                                      $stmtAnyIndeterminate = $pdo->prepare("SELECT COUNT(*) FROM accounts a LEFT JOIN recurring_settings rs ON rs.account_id = a.id WHERE a.user_id = :uid AND a.description = :desc AND a.is_recurring = 1 AND ((rs.max_occurrences IS NULL OR rs.max_occurrences = 0) AND (rs.end_date IS NULL OR CAST(rs.end_date AS CHAR(10)) = '0000-00-00'))");
+                                      $stmtAnyIndeterminate->execute([':uid' => $userId, ':desc' => $account['description']]);
+                                      $hasAnyIndeterminate = intval($stmtAnyIndeterminate->fetchColumn()) > 0;
+                                      if ($hasAnyIndeterminate || (!$recSet) || (($maxOccurrences <= 0) && $noEnd)) {
                                           $remainingInstallmentsDisplay = '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">sem data de término</span>';
                                       } else {
                                           $stmtPendingChildren = $recurringModel->getConnection()->prepare("SELECT COUNT(*) FROM accounts WHERE recurring_parent_id = :pid AND status = 'pendente'");
@@ -1148,16 +1158,67 @@ if ($action == 'list') {
                                           $remainingInstallmentsDisplay = $pendingChildren;
                                       }
                                         } else {
-                                            $stmtTotal = $pdo->prepare("SELECT COUNT(*) FROM accounts WHERE user_id = :uid AND type = :type AND description = :desc");
-                                            $stmtTotal->execute([':uid' => $userId, ':type' => $account['type'], ':desc' => $account['description']]);
-                                            $total = intval($stmtTotal->fetchColumn());
-                                            if ($total <= 1) {
-                                                $remainingInstallmentsDisplay = '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">parcela única</span>';
+                                            $stmtCheckRec = $pdo->prepare("SELECT rs.max_occurrences, rs.end_date
+                                                FROM accounts a
+                                                LEFT JOIN recurring_settings rs ON rs.account_id = a.id
+                                                WHERE a.user_id = :uid AND a.description = :desc AND a.is_recurring = 1
+                                                ORDER BY 
+                                                  CASE WHEN ((rs.max_occurrences IS NULL OR rs.max_occurrences = 0) AND (rs.end_date IS NULL OR CAST(rs.end_date AS CHAR(10)) = '0000-00-00')) THEN 0 ELSE 1 END ASC,
+                                                  a.id DESC
+                                                LIMIT 1");
+                                            $stmtCheckRec->execute([':uid' => $userId, ':desc' => $account['description']]);
+                                            $rowRec = $stmtCheckRec->fetch(PDO::FETCH_ASSOC);
+                                            $maxOccX = intval($rowRec['max_occurrences'] ?? 0);
+                                            $endX = $rowRec['end_date'] ?? null;
+                                            $noEndX = empty($endX) || $endX === '0000-00-00';
+                                            if (!$rowRec || (($maxOccX <= 0) && $noEndX)) {
+                                                $remainingInstallmentsDisplay = '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">sem data de término</span>';
+                                    } else {
+                                        $stmtCheckRec = $pdo->prepare("SELECT rs.max_occurrences, rs.end_date
+                                            FROM accounts a
+                                            LEFT JOIN recurring_settings rs ON rs.account_id = a.id
+                                            WHERE a.user_id = :uid AND a.description = :desc AND a.is_recurring = 1
+                                            ORDER BY 
+                                              CASE WHEN ((rs.max_occurrences IS NULL OR rs.max_occurrences = 0) AND (rs.end_date IS NULL OR CAST(rs.end_date AS CHAR(10)) = '0000-00-00')) THEN 0 ELSE 1 END ASC,
+                                              a.id DESC
+                                            LIMIT 1");
+                                        $stmtCheckRec->execute([':uid' => $userId, ':desc' => $account['description']]);
+                                        $rowRec = $stmtCheckRec->fetch(PDO::FETCH_ASSOC);
+                                        $maxOccX = intval($rowRec['max_occurrences'] ?? 0);
+                                        $endX = $rowRec['end_date'] ?? null;
+                                        $noEndX = empty($endX) || $endX === '0000-00-00';
+                                        if (!$rowRec || (($maxOccX <= 0) && $noEndX)) {
+                                            $remainingInstallmentsDisplay = '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">sem data de término</span>';
+                                        } else {
+                                            $stmtCheckRec = $pdo->prepare("SELECT rs.max_occurrences, rs.end_date
+                                                FROM accounts a
+                                                LEFT JOIN recurring_settings rs ON rs.account_id = a.id
+                                                WHERE a.user_id = :uid AND a.description = :desc AND a.is_recurring = 1
+                                                ORDER BY 
+                                                  CASE WHEN ((rs.max_occurrences IS NULL OR rs.max_occurrences = 0) AND (rs.end_date IS NULL OR CAST(rs.end_date AS CHAR(10)) = '0000-00-00')) THEN 0 ELSE 1 END ASC,
+                                                  a.id DESC
+                                                LIMIT 1");
+                                            $stmtCheckRec->execute([':uid' => $userId, ':desc' => $account['description']]);
+                                            $rowRec = $stmtCheckRec->fetch(PDO::FETCH_ASSOC);
+                                            $maxOccX = intval($rowRec['max_occurrences'] ?? 0);
+                                            $endX = $rowRec['end_date'] ?? null;
+                                            $noEndX = empty($endX) || $endX === '0000-00-00';
+                                            if (!$rowRec || (($maxOccX <= 0) && $noEndX)) {
+                                                $remainingInstallmentsDisplay = '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">sem data de término</span>';
                                             } else {
-                                                $stmtPending = $pdo->prepare("SELECT COUNT(*) FROM accounts WHERE user_id = :uid AND type = :type AND description = :desc AND status = 'pendente'");
-                                                $stmtPending->execute([':uid' => $userId, ':type' => $account['type'], ':desc' => $account['description']]);
-                                                $remainingInstallmentsDisplay = intval($stmtPending->fetchColumn());
+                                                $stmtTotal = $pdo->prepare("SELECT COUNT(*) FROM accounts WHERE user_id = :uid AND type = :type AND description = :desc");
+                                                $stmtTotal->execute([':uid' => $userId, ':type' => $account['type'], ':desc' => $account['description']]);
+                                                $total = intval($stmtTotal->fetchColumn());
+                                                if ($total <= 1) {
+                                                    $remainingInstallmentsDisplay = '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">parcela única</span>';
+                                                } else {
+                                                    $stmtPending = $pdo->prepare("SELECT COUNT(*) FROM accounts WHERE user_id = :uid AND type = :type AND description = :desc AND status = 'pendente'");
+                                                    $stmtPending->execute([':uid' => $userId, ':type' => $account['type'], ':desc' => $account['description']]);
+                                                    $remainingInstallmentsDisplay = intval($stmtPending->fetchColumn());
+                                                }
                                             }
+                                        }
+                                    }
                                         }
                                         $label = is_numeric($remainingInstallmentsDisplay) ? (string)$remainingInstallmentsDisplay : strip_tags((string)$remainingInstallmentsDisplay);
                                          echo '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">' . htmlspecialchars($label) . '</span>';
@@ -1292,7 +1353,14 @@ if ($action == 'list') {
                                     <?php
                                         $parentId = !empty($account['recurring_parent_id']) ? $account['recurring_parent_id'] : (intval($account['is_recurring']) === 1 ? $account['id'] : null);
                                         if (!$parentId) {
-                                            $stmtFindParent = $pdo->prepare("SELECT id FROM accounts WHERE user_id = :uid AND description = :desc AND is_recurring = 1 ORDER BY id DESC LIMIT 1");
+                                            $stmtFindParent = $pdo->prepare("SELECT a.id
+                                                FROM accounts a
+                                                LEFT JOIN recurring_settings rs ON rs.account_id = a.id
+                                                WHERE a.user_id = :uid AND a.description = :desc AND a.is_recurring = 1
+                                                ORDER BY 
+                                                  CASE WHEN ((rs.max_occurrences IS NULL OR rs.max_occurrences = 0) AND (rs.end_date IS NULL OR CAST(rs.end_date AS CHAR(10)) = '0000-00-00')) THEN 0 ELSE 1 END ASC,
+                                                  a.id DESC
+                                                LIMIT 1");
                                             $stmtFindParent->execute([':uid' => $userId, ':desc' => $account['description']]);
                                             $rowParent = $stmtFindParent->fetch(PDO::FETCH_ASSOC);
                                             $parentId = $rowParent['id'] ?? null;
@@ -1303,7 +1371,10 @@ if ($action == 'list') {
                                                 $maxOccurrences = intval($recSet['max_occurrences'] ?? 0);
                                                 $endDate = $recSet['end_date'] ?? null;
                                                 $noEnd = empty($endDate) || $endDate === '0000-00-00';
-                                                if ((!$recSet) || (($maxOccurrences <= 0) && $noEnd)) {
+                                                $stmtAnyIndeterminate = $pdo->prepare("SELECT COUNT(*) FROM accounts a LEFT JOIN recurring_settings rs ON rs.account_id = a.id WHERE a.user_id = :uid AND a.description = :desc AND a.is_recurring = 1 AND ((rs.max_occurrences IS NULL OR rs.max_occurrences = 0) AND (rs.end_date IS NULL OR CAST(rs.end_date AS CHAR(10)) = '0000-00-00'))");
+                                                $stmtAnyIndeterminate->execute([':uid' => $userId, ':desc' => $account['description']]);
+                                                $hasAnyIndeterminate = intval($stmtAnyIndeterminate->fetchColumn()) > 0;
+                                                if ($hasAnyIndeterminate || (!$recSet) || (($maxOccurrences <= 0) && $noEnd)) {
                                                 $remainingInstallmentsDisplay = '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">sem data de término</span>';
                                             } else {
                                                 $stmtPendingChildren = $recurringModel->getConnection()->prepare("SELECT COUNT(*) FROM accounts WHERE recurring_parent_id = :pid AND status = 'pendente'");
@@ -1318,15 +1389,32 @@ if ($action == 'list') {
                                                 $remainingInstallmentsDisplay = $pendingChildren;
                                             }
                                         } else {
-                                            $stmtTotal = $pdo->prepare("SELECT COUNT(*) FROM accounts WHERE user_id = :uid AND type = :type AND description = :desc");
-                                            $stmtTotal->execute([':uid' => $userId, ':type' => $account['type'], ':desc' => $account['description']]);
-                                            $total = intval($stmtTotal->fetchColumn());
-                                            if ($total <= 1) {
-                                                $remainingInstallmentsDisplay = '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">parcela única</span>';
+                                            $stmtCheckRec = $pdo->prepare("SELECT rs.max_occurrences, rs.end_date
+                                                FROM accounts a
+                                                LEFT JOIN recurring_settings rs ON rs.account_id = a.id
+                                                WHERE a.user_id = :uid AND a.description = :desc AND a.is_recurring = 1
+                                                ORDER BY 
+                                                  CASE WHEN ((rs.max_occurrences IS NULL OR rs.max_occurrences = 0) AND (rs.end_date IS NULL OR CAST(rs.end_date AS CHAR(10)) = '0000-00-00')) THEN 0 ELSE 1 END ASC,
+                                                  a.id DESC
+                                                LIMIT 1");
+                                            $stmtCheckRec->execute([':uid' => $userId, ':desc' => $account['description']]);
+                                            $rowRec = $stmtCheckRec->fetch(PDO::FETCH_ASSOC);
+                                            $maxOccX = intval($rowRec['max_occurrences'] ?? 0);
+                                            $endX = $rowRec['end_date'] ?? null;
+                                            $noEndX = empty($endX) || $endX === '0000-00-00';
+                                            if (!$rowRec || (($maxOccX <= 0) && $noEndX)) {
+                                                $remainingInstallmentsDisplay = '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">sem data de término</span>';
                                             } else {
-                                                $stmtPending = $pdo->prepare("SELECT COUNT(*) FROM accounts WHERE user_id = :uid AND type = :type AND description = :desc AND status = 'pendente'");
-                                                $stmtPending->execute([':uid' => $userId, ':type' => $account['type'], ':desc' => $account['description']]);
-                                                $remainingInstallmentsDisplay = intval($stmtPending->fetchColumn());
+                                                $stmtTotal = $pdo->prepare("SELECT COUNT(*) FROM accounts WHERE user_id = :uid AND type = :type AND description = :desc");
+                                                $stmtTotal->execute([':uid' => $userId, ':type' => $account['type'], ':desc' => $account['description']]);
+                                                $total = intval($stmtTotal->fetchColumn());
+                                                if ($total <= 1) {
+                                                    $remainingInstallmentsDisplay = '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">parcela única</span>';
+                                                } else {
+                                                    $stmtPending = $pdo->prepare("SELECT COUNT(*) FROM accounts WHERE user_id = :uid AND type = :type AND description = :desc AND status = 'pendente'");
+                                                    $stmtPending->execute([':uid' => $userId, ':type' => $account['type'], ':desc' => $account['description']]);
+                                                    $remainingInstallmentsDisplay = intval($stmtPending->fetchColumn());
+                                                }
                                             }
                                         }
                                         $label = is_numeric($remainingInstallmentsDisplay) ? (string)$remainingInstallmentsDisplay : strip_tags((string)$remainingInstallmentsDisplay);
@@ -1432,7 +1520,14 @@ if ($action == 'list') {
                                 <?php
                                     $parentId = !empty($account['recurring_parent_id']) ? $account['recurring_parent_id'] : (intval($account['is_recurring']) === 1 ? $account['id'] : null);
                                     if (!$parentId) {
-                                        $stmtFindParent = $pdo->prepare("SELECT id FROM accounts WHERE user_id = :uid AND description = :desc AND is_recurring = 1 ORDER BY id DESC LIMIT 1");
+                                        $stmtFindParent = $pdo->prepare("SELECT a.id
+                                            FROM accounts a
+                                            LEFT JOIN recurring_settings rs ON rs.account_id = a.id
+                                            WHERE a.user_id = :uid AND a.description = :desc AND a.is_recurring = 1
+                                            ORDER BY 
+                                              CASE WHEN ((rs.max_occurrences IS NULL OR rs.max_occurrences = 0) AND (rs.end_date IS NULL OR CAST(rs.end_date AS CHAR(10)) = '0000-00-00')) THEN 0 ELSE 1 END ASC,
+                                              a.id DESC
+                                            LIMIT 1");
                                         $stmtFindParent->execute([':uid' => $userId, ':desc' => $account['description']]);
                                         $rowParent = $stmtFindParent->fetch(PDO::FETCH_ASSOC);
                                         $parentId = $rowParent['id'] ?? null;
@@ -1443,7 +1538,10 @@ if ($action == 'list') {
                                         $maxOccurrences = intval($recSet['max_occurrences'] ?? 0);
                                         $endDate = $recSet['end_date'] ?? null;
                                         $noEnd = empty($endDate) || $endDate === '0000-00-00';
-                                        if ((!$recSet) || (($maxOccurrences <= 0) && $noEnd)) {
+                                        $stmtAnyIndeterminate = $pdo->prepare("SELECT COUNT(*) FROM accounts a LEFT JOIN recurring_settings rs ON rs.account_id = a.id WHERE a.user_id = :uid AND a.description = :desc AND a.is_recurring = 1 AND ((rs.max_occurrences IS NULL OR rs.max_occurrences = 0) AND (rs.end_date IS NULL OR CAST(rs.end_date AS CHAR(10)) = '0000-00-00'))");
+                                        $stmtAnyIndeterminate->execute([':uid' => $userId, ':desc' => $account['description']]);
+                                        $hasAnyIndeterminate = intval($stmtAnyIndeterminate->fetchColumn()) > 0;
+                                        if ($hasAnyIndeterminate || (!$recSet) || (($maxOccurrences <= 0) && $noEnd)) {
                                             $remainingInstallmentsDisplay = '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">sem data de término</span>';
                                         } else {
                                             $stmtPendingChildren = $recurringModel->getConnection()->prepare("SELECT COUNT(*) FROM accounts WHERE recurring_parent_id = :pid AND status = 'pendente'");
@@ -1458,15 +1556,49 @@ if ($action == 'list') {
                                             $remainingInstallmentsDisplay = $pendingChildren;
                                         }
                                     } else {
-                                        $stmtTotal = $pdo->prepare("SELECT COUNT(*) FROM accounts WHERE user_id = :uid AND type = :type AND description = :desc");
-                                        $stmtTotal->execute([':uid' => $userId, ':type' => $account['type'], ':desc' => $account['description']]);
-                                        $total = intval($stmtTotal->fetchColumn());
-                                        if ($total <= 1) {
-                                            $remainingInstallmentsDisplay = '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">parcela única</span>';
+                                        $stmtCheckRec = $pdo->prepare("SELECT rs.max_occurrences, rs.end_date
+                                            FROM accounts a
+                                            LEFT JOIN recurring_settings rs ON rs.account_id = a.id
+                                            WHERE a.user_id = :uid AND a.description = :desc AND a.is_recurring = 1
+                                            ORDER BY 
+                                              CASE WHEN ((rs.max_occurrences IS NULL OR rs.max_occurrences = 0) AND (rs.end_date IS NULL OR CAST(rs.end_date AS CHAR(10)) = '0000-00-00')) THEN 0 ELSE 1 END ASC,
+                                              a.id DESC
+                                            LIMIT 1");
+                                        $stmtCheckRec->execute([':uid' => $userId, ':desc' => $account['description']]);
+                                        $rowRec = $stmtCheckRec->fetch(PDO::FETCH_ASSOC);
+                                        $maxOccX = intval($rowRec['max_occurrences'] ?? 0);
+                                        $endX = $rowRec['end_date'] ?? null;
+                                        $noEndX = empty($endX) || $endX === '0000-00-00';
+                                        if (!$rowRec || (($maxOccX <= 0) && $noEndX)) {
+                                            $remainingInstallmentsDisplay = '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">sem data de término</span>';
                                         } else {
-                                            $stmtPending = $pdo->prepare("SELECT COUNT(*) FROM accounts WHERE user_id = :uid AND type = :type AND description = :desc AND status = 'pendente'");
-                                            $stmtPending->execute([':uid' => $userId, ':type' => $account['type'], ':desc' => $account['description']]);
-                                            $remainingInstallmentsDisplay = intval($stmtPending->fetchColumn());
+                                            $stmtCheckRec = $pdo->prepare("SELECT rs.max_occurrences, rs.end_date
+                                                FROM accounts a
+                                                LEFT JOIN recurring_settings rs ON rs.account_id = a.id
+                                                WHERE a.user_id = :uid AND a.description = :desc AND a.is_recurring = 1
+                                                ORDER BY 
+                                                  CASE WHEN ((rs.max_occurrences IS NULL OR rs.max_occurrences = 0) AND (rs.end_date IS NULL OR CAST(rs.end_date AS CHAR(10)) = '0000-00-00')) THEN 0 ELSE 1 END ASC,
+                                                  a.id DESC
+                                                LIMIT 1");
+                                            $stmtCheckRec->execute([':uid' => $userId, ':desc' => $account['description']]);
+                                            $rowRec = $stmtCheckRec->fetch(PDO::FETCH_ASSOC);
+                                            $maxOccX = intval($rowRec['max_occurrences'] ?? 0);
+                                            $endX = $rowRec['end_date'] ?? null;
+                                            $noEndX = empty($endX) || $endX === '0000-00-00';
+                                            if (!$rowRec || (($maxOccX <= 0) && $noEndX)) {
+                                                $remainingInstallmentsDisplay = '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">sem data de término</span>';
+                                            } else {
+                                                $stmtTotal = $pdo->prepare("SELECT COUNT(*) FROM accounts WHERE user_id = :uid AND type = :type AND description = :desc");
+                                                $stmtTotal->execute([':uid' => $userId, ':type' => $account['type'], ':desc' => $account['description']]);
+                                                $total = intval($stmtTotal->fetchColumn());
+                                                if ($total <= 1) {
+                                                    $remainingInstallmentsDisplay = '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">parcela única</span>';
+                                                } else {
+                                                    $stmtPending = $pdo->prepare("SELECT COUNT(*) FROM accounts WHERE user_id = :uid AND type = :type AND description = :desc AND status = 'pendente'");
+                                                    $stmtPending->execute([':uid' => $userId, ':type' => $account['type'], ':desc' => $account['description']]);
+                                                    $remainingInstallmentsDisplay = intval($stmtPending->fetchColumn());
+                                                }
+                                            }
                                         }
                                     }
                                     $label = is_numeric($remainingInstallmentsDisplay) ? (string)$remainingInstallmentsDisplay : strip_tags((string)$remainingInstallmentsDisplay);
@@ -1734,7 +1866,14 @@ if ($action == 'list') {
                                     <?php
                                         $parentId = !empty($account['recurring_parent_id']) ? $account['recurring_parent_id'] : (intval($account['is_recurring']) === 1 ? $account['id'] : null);
                                         if (!$parentId) {
-                                            $stmtFindParent = $pdo->prepare("SELECT id FROM accounts WHERE user_id = :uid AND description = :desc AND is_recurring = 1 ORDER BY id DESC LIMIT 1");
+                                            $stmtFindParent = $pdo->prepare("SELECT a.id
+                                                FROM accounts a
+                                                LEFT JOIN recurring_settings rs ON rs.account_id = a.id
+                                                WHERE a.user_id = :uid AND a.description = :desc AND a.is_recurring = 1
+                                            ORDER BY 
+                                              CASE WHEN ((rs.max_occurrences IS NULL OR rs.max_occurrences = 0) AND (rs.end_date IS NULL OR CAST(rs.end_date AS CHAR(10)) = '0000-00-00')) THEN 0 ELSE 1 END ASC,
+                                                  a.id DESC
+                                                LIMIT 1");
                                             $stmtFindParent->execute([':uid' => $userId, ':desc' => $account['description']]);
                                             $rowParent = $stmtFindParent->fetch(PDO::FETCH_ASSOC);
                                             $parentId = $rowParent['id'] ?? null;
@@ -1745,7 +1884,10 @@ if ($action == 'list') {
                                                 $maxOccurrences = intval($recSet['max_occurrences'] ?? 0);
                                                 $endDate = $recSet['end_date'] ?? null;
                                                 $noEnd = empty($endDate) || $endDate === '0000-00-00';
-                                                if ((!$recSet) || (($maxOccurrences <= 0) && $noEnd)) {
+                                      $stmtAnyIndeterminate = $pdo->prepare("SELECT COUNT(*) FROM accounts a LEFT JOIN recurring_settings rs ON rs.account_id = a.id WHERE a.user_id = :uid AND a.description = :desc AND a.is_recurring = 1 AND ((rs.max_occurrences IS NULL OR rs.max_occurrences = 0) AND (rs.end_date IS NULL OR CAST(rs.end_date AS CHAR(10)) = '0000-00-00'))");
+                                                $stmtAnyIndeterminate->execute([':uid' => $userId, ':desc' => $account['description']]);
+                                                $hasAnyIndeterminate = intval($stmtAnyIndeterminate->fetchColumn()) > 0;
+                                                if ($hasAnyIndeterminate || (!$recSet) || (($maxOccurrences <= 0) && $noEnd)) {
                                                 $remainingInstallmentsDisplay = '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">sem data de término</span>';
                                             } else {
                                                 $stmtPendingChildren = $recurringModel->getConnection()->prepare("SELECT COUNT(*) FROM accounts WHERE recurring_parent_id = :pid AND status = 'pendente'");
@@ -1904,7 +2046,14 @@ if ($action == 'list') {
                                     <?php
                                         $parentId = !empty($account['recurring_parent_id']) ? $account['recurring_parent_id'] : (intval($account['is_recurring']) === 1 ? $account['id'] : null);
                                         if (!$parentId) {
-                                            $stmtFindParent = $pdo->prepare("SELECT id FROM accounts WHERE user_id = :uid AND description = :desc AND is_recurring = 1 ORDER BY id DESC LIMIT 1");
+                                            $stmtFindParent = $pdo->prepare("SELECT a.id
+                                                FROM accounts a
+                                                LEFT JOIN recurring_settings rs ON rs.account_id = a.id
+                                                WHERE a.user_id = :uid AND a.description = :desc AND a.is_recurring = 1
+                                                ORDER BY 
+                                              CASE WHEN ((rs.max_occurrences IS NULL OR rs.max_occurrences = 0) AND (rs.end_date IS NULL OR CAST(rs.end_date AS CHAR(10)) = '0000-00-00')) THEN 0 ELSE 1 END ASC,
+                                                  a.id DESC
+                                                LIMIT 1");
                                             $stmtFindParent->execute([':uid' => $userId, ':desc' => $account['description']]);
                                             $rowParent = $stmtFindParent->fetch(PDO::FETCH_ASSOC);
                                             $parentId = $rowParent['id'] ?? null;
@@ -1915,7 +2064,10 @@ if ($action == 'list') {
                                       $maxOccurrences = intval($recSet['max_occurrences'] ?? 0);
                                       $endDate = $recSet['end_date'] ?? null;
                                       $noEnd = empty($endDate) || $endDate === '0000-00-00';
-                                      if ((!$recSet) || (($maxOccurrences <= 0) && $noEnd)) {
+                                      $stmtAnyIndeterminate = $pdo->prepare("SELECT COUNT(*) FROM accounts a LEFT JOIN recurring_settings rs ON rs.account_id = a.id WHERE a.user_id = :uid AND a.description = :desc AND a.is_recurring = 1 AND ((rs.max_occurrences IS NULL OR rs.max_occurrences = 0) AND (rs.end_date IS NULL OR CAST(rs.end_date AS CHAR(10)) = '0000-00-00'))");
+                                      $stmtAnyIndeterminate->execute([':uid' => $userId, ':desc' => $account['description']]);
+                                      $hasAnyIndeterminate = intval($stmtAnyIndeterminate->fetchColumn()) > 0;
+                                      if ($hasAnyIndeterminate || (!$recSet) || (($maxOccurrences <= 0) && $noEnd)) {
                                           $remainingInstallmentsDisplay = '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">sem data de término</span>';
                                       } else {
                                           $stmtPendingChildren = $recurringModel->getConnection()->prepare("SELECT COUNT(*) FROM accounts WHERE recurring_parent_id = :pid AND status = 'pendente'");
@@ -2044,7 +2196,14 @@ if ($action == 'list') {
                                     <?php
                                         $parentId = !empty($account['recurring_parent_id']) ? $account['recurring_parent_id'] : (intval($account['is_recurring']) === 1 ? $account['id'] : null);
                                         if (!$parentId) {
-                                            $stmtFindParent = $pdo->prepare("SELECT id FROM accounts WHERE user_id = :uid AND description = :desc AND is_recurring = 1 ORDER BY id DESC LIMIT 1");
+                                            $stmtFindParent = $pdo->prepare("SELECT a.id
+                                                FROM accounts a
+                                                LEFT JOIN recurring_settings rs ON rs.account_id = a.id
+                                                WHERE a.user_id = :uid AND a.description = :desc AND a.is_recurring = 1
+                                                ORDER BY 
+                                                  CASE WHEN ((rs.max_occurrences IS NULL OR rs.max_occurrences = 0) AND (rs.end_date IS NULL OR CAST(rs.end_date AS CHAR(10)) = '0000-00-00')) THEN 0 ELSE 1 END ASC,
+                                                  a.id DESC
+                                                LIMIT 1");
                                             $stmtFindParent->execute([':uid' => $userId, ':desc' => $account['description']]);
                                             $rowParent = $stmtFindParent->fetch(PDO::FETCH_ASSOC);
                                             $parentId = $rowParent['id'] ?? null;
@@ -2055,7 +2214,10 @@ if ($action == 'list') {
                                                 $maxOccurrences = intval($recSet['max_occurrences'] ?? 0);
                                                 $endDate = $recSet['end_date'] ?? null;
                                                 $noEnd = empty($endDate) || $endDate === '0000-00-00';
-                                                if ((!$recSet) || (($maxOccurrences <= 0) && $noEnd)) {
+                                                $stmtAnyIndeterminate = $pdo->prepare("SELECT COUNT(*) FROM accounts a LEFT JOIN recurring_settings rs ON rs.account_id = a.id WHERE a.user_id = :uid AND a.description = :desc AND a.is_recurring = 1 AND ((rs.max_occurrences IS NULL OR rs.max_occurrences = 0) AND (rs.end_date IS NULL OR CAST(rs.end_date AS CHAR(10)) = '0000-00-00'))");
+                                                $stmtAnyIndeterminate->execute([':uid' => $userId, ':desc' => $account['description']]);
+                                                $hasAnyIndeterminate = intval($stmtAnyIndeterminate->fetchColumn()) > 0;
+                                                if ($hasAnyIndeterminate || (!$recSet) || (($maxOccurrences <= 0) && $noEnd)) {
                                                 $remainingInstallmentsDisplay = '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">sem data de término</span>';
                                             } else {
                                                 $stmtPendingChildren = $recurringModel->getConnection()->prepare("SELECT COUNT(*) FROM accounts WHERE recurring_parent_id = :pid AND status = 'pendente'");
