@@ -1138,7 +1138,7 @@ if ($action == 'list') {
                                           $parentStatus = $stmtParentStatus->fetchColumn();
                                           $pendingParent = ($parentStatus === 'pendente') ? 1 : 0;
 
-                                          $remainingInstallmentsDisplay = $pendingChildren + $pendingParent;
+                                          $remainingInstallmentsDisplay = $pendingChildren;
                                       }
                                         } else {
                                             $stmtTotal = $pdo->prepare("SELECT COUNT(*) FROM accounts WHERE user_id = :uid AND type = :type AND description = :desc");
@@ -1301,7 +1301,7 @@ if ($action == 'list') {
                                                 $parentStatus = $stmtParentStatus->fetchColumn();
                                                 $pendingParent = ($parentStatus === 'pendente') ? 1 : 0;
 
-                                                $remainingInstallmentsDisplay = $pendingChildren + $pendingParent;
+                                                $remainingInstallmentsDisplay = $pendingChildren;
                                             }
                                         } else {
                                             $stmtTotal = $pdo->prepare("SELECT COUNT(*) FROM accounts WHERE user_id = :uid AND type = :type AND description = :desc");
@@ -1434,7 +1434,7 @@ if ($action == 'list') {
                                             $parentStatus = $stmtParentStatus->fetchColumn();
                                             $pendingParent = ($parentStatus === 'pendente') ? 1 : 0;
 
-                                            $remainingInstallmentsDisplay = $pendingChildren + $pendingParent;
+                                            $remainingInstallmentsDisplay = $pendingChildren;
                                         }
                                     } else {
                                         $stmtTotal = $pdo->prepare("SELECT COUNT(*) FROM accounts WHERE user_id = :uid AND type = :type AND description = :desc");
@@ -1714,16 +1714,23 @@ if ($action == 'list') {
                                         $parentId = !empty($account['recurring_parent_id']) ? $account['recurring_parent_id'] : (intval($account['is_recurring']) === 1 ? $account['id'] : null);
                                         $remainingInstallmentsDisplay = '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">-</span>';
                                         if ($parentId) {
-                                            $stmtPendingChildren = $recurringModel->getConnection()->prepare("SELECT COUNT(*) FROM accounts WHERE recurring_parent_id = :pid AND status = 'pendente'");
-                                                  $stmtPendingChildren->execute([':pid' => $parentId]);
-                                                  $pendingChildren = intval($stmtPendingChildren->fetchColumn());
+                                            $recSet = $recurringModel->getByAccountId($parentId);
+                                            $maxOccurrences = intval($recSet['max_occurrences'] ?? 0);
+                                            $endDate = $recSet['end_date'] ?? null;
+                                            if ($recSet && ($maxOccurrences <= 0) && empty($endDate)) {
+                                                $remainingInstallmentsDisplay = '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">sem data de término</span>';
+                                            } else {
+                                                $stmtPendingChildren = $recurringModel->getConnection()->prepare("SELECT COUNT(*) FROM accounts WHERE recurring_parent_id = :pid AND status = 'pendente'");
+                                                $stmtPendingChildren->execute([':pid' => $parentId]);
+                                                $pendingChildren = intval($stmtPendingChildren->fetchColumn());
 
-                                                  $stmtParentStatus = $recurringModel->getConnection()->prepare("SELECT status FROM accounts WHERE id = :pid");
-                                                  $stmtParentStatus->execute([':pid' => $parentId]);
-                                                  $parentStatus = $stmtParentStatus->fetchColumn();
-                                                  $pendingParent = ($parentStatus === 'pendente') ? 1 : 0;
+                                                $stmtParentStatus = $recurringModel->getConnection()->prepare("SELECT status FROM accounts WHERE id = :pid");
+                                                $stmtParentStatus->execute([':pid' => $parentId]);
+                                                $parentStatus = $stmtParentStatus->fetchColumn();
+                                                $pendingParent = ($parentStatus === 'pendente') ? 1 : 0;
 
-                                                  $remainingInstallmentsDisplay = $pendingChildren + $pendingParent;
+                                                  $remainingInstallmentsDisplay = $pendingChildren;
+                                            }
                                         } else {
                                             $stmtTotal = $pdo->prepare("SELECT COUNT(*) FROM accounts WHERE user_id = :uid AND type = :type AND description = :desc");
                                             $stmtTotal->execute([':uid' => $userId, ':type' => $account['type'], ':desc' => $account['description']]);
@@ -1737,7 +1744,7 @@ if ($action == 'list') {
                                             }
                                         }
                                         $label = is_numeric($remainingInstallmentsDisplay) ? (string)$remainingInstallmentsDisplay : strip_tags((string)$remainingInstallmentsDisplay);
-                                           echo '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">' . htmlspecialchars($label) . '</span>';
+                                        echo '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">' . htmlspecialchars($label) . '</span>';
                                     ?>
                                 </td>
                                 <td class="px-6 py-4">
@@ -1885,7 +1892,7 @@ if ($action == 'list') {
                                           $parentStatus = $stmtParentStatus->fetchColumn();
                                           $pendingParent = ($parentStatus === 'pendente') ? 1 : 0;
 
-                                          $remainingInstallmentsDisplay = $pendingChildren + $pendingParent;
+                                          $remainingInstallmentsDisplay = $pendingChildren;
                                       }
                                         } else {
                                             $stmtTotal = $pdo->prepare("SELECT COUNT(*) FROM accounts WHERE user_id = :uid AND type = :type AND description = :desc");
@@ -1998,37 +2005,44 @@ if ($action == 'list') {
                                 <?= formatCurrency($account['amount']) ?>
                             </td>
                             <td class="px-6 py-4 text-sm text-gray-900"><?= formatDate($account['due_date']) ?></td>
-                            <td class="px-6 py-4 text-sm text-gray-900">
-                                <?php
-                                    $parentId = !empty($account['recurring_parent_id']) ? $account['recurring_parent_id'] : (intval($account['is_recurring']) === 1 ? $account['id'] : null);
-                                    $remainingInstallmentsDisplay = '<span class="text-gray-400 text-xs">-</span>';
-                                    if ($parentId) {
-                                        $stmtPendingChildren = $recurringModel->getConnection()->prepare("SELECT COUNT(*) FROM accounts WHERE recurring_parent_id = :pid AND status = 'pendente'");
-                                                  $stmtPendingChildren->execute([':pid' => $parentId]);
-                                                  $pendingChildren = intval($stmtPendingChildren->fetchColumn());
+                                <td class="px-6 py-4 text-sm text-gray-900">
+                                    <?php
+                                        $parentId = !empty($account['recurring_parent_id']) ? $account['recurring_parent_id'] : (intval($account['is_recurring']) === 1 ? $account['id'] : null);
+                                        $remainingInstallmentsDisplay = '<span class="text-gray-400 text-xs">-</span>';
+                                        if ($parentId) {
+                                            $recSet = $recurringModel->getByAccountId($parentId);
+                                            $maxOccurrences = intval($recSet['max_occurrences'] ?? 0);
+                                            $endDate = $recSet['end_date'] ?? null;
+                                            if ($recSet && ($maxOccurrences <= 0) && empty($endDate)) {
+                                                $remainingInstallmentsDisplay = '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">sem data de término</span>';
+                                            } else {
+                                                $stmtPendingChildren = $recurringModel->getConnection()->prepare("SELECT COUNT(*) FROM accounts WHERE recurring_parent_id = :pid AND status = 'pendente'");
+                                                $stmtPendingChildren->execute([':pid' => $parentId]);
+                                                $pendingChildren = intval($stmtPendingChildren->fetchColumn());
 
-                                                  $stmtParentStatus = $recurringModel->getConnection()->prepare("SELECT status FROM accounts WHERE id = :pid");
-                                                  $stmtParentStatus->execute([':pid' => $parentId]);
-                                                  $parentStatus = $stmtParentStatus->fetchColumn();
-                                                  $pendingParent = ($parentStatus === 'pendente') ? 1 : 0;
+                                                $stmtParentStatus = $recurringModel->getConnection()->prepare("SELECT status FROM accounts WHERE id = :pid");
+                                                $stmtParentStatus->execute([':pid' => $parentId]);
+                                                $parentStatus = $stmtParentStatus->fetchColumn();
+                                                $pendingParent = ($parentStatus === 'pendente') ? 1 : 0;
 
-                                                  $remainingInstallmentsDisplay = $pendingChildren + $pendingParent;
-                                    } else {
-                                        $stmtTotal = $pdo->prepare("SELECT COUNT(*) FROM accounts WHERE user_id = :uid AND type = :type AND description = :desc");
-                                        $stmtTotal->execute([':uid' => $userId, ':type' => $account['type'], ':desc' => $account['description']]);
-                                        $total = intval($stmtTotal->fetchColumn());
-                                        if ($total <= 1) {
-                                            $remainingInstallmentsDisplay = '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">parcela única</span>';
+                                                  $remainingInstallmentsDisplay = $pendingChildren;
+                                            }
                                         } else {
-                                            $stmtPending = $pdo->prepare("SELECT COUNT(*) FROM accounts WHERE user_id = :uid AND type = :type AND description = :desc AND status = 'pendente'");
-                                            $stmtPending->execute([':uid' => $userId, ':type' => $account['type'], ':desc' => $account['description']]);
-                                            $remainingInstallmentsDisplay = intval($stmtPending->fetchColumn());
+                                            $stmtTotal = $pdo->prepare("SELECT COUNT(*) FROM accounts WHERE user_id = :uid AND type = :type AND description = :desc");
+                                            $stmtTotal->execute([':uid' => $userId, ':type' => $account['type'], ':desc' => $account['description']]);
+                                            $total = intval($stmtTotal->fetchColumn());
+                                            if ($total <= 1) {
+                                                $remainingInstallmentsDisplay = '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">parcela única</span>';
+                                            } else {
+                                                $stmtPending = $pdo->prepare("SELECT COUNT(*) FROM accounts WHERE user_id = :uid AND type = :type AND description = :desc AND status = 'pendente'");
+                                                $stmtPending->execute([':uid' => $userId, ':type' => $account['type'], ':desc' => $account['description']]);
+                                                $remainingInstallmentsDisplay = intval($stmtPending->fetchColumn());
+                                            }
                                         }
-                                    }
-                                    $label = is_numeric($remainingInstallmentsDisplay) ? (string)$remainingInstallmentsDisplay : strip_tags((string)$remainingInstallmentsDisplay);
-                                    echo '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">' . htmlspecialchars($label) . '</span>';
-                                ?>
-                            </td>
+                                        $label = is_numeric($remainingInstallmentsDisplay) ? (string)$remainingInstallmentsDisplay : strip_tags((string)$remainingInstallmentsDisplay);
+                                        echo '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">' . htmlspecialchars($label) . '</span>';
+                                    ?>
+                                </td>
                             <td class="px-6 py-4">
                                 <form method="POST" class="inline">
                                     <input type="hidden" name="action" value="update_status">
