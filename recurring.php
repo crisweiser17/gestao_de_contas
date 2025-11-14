@@ -91,6 +91,34 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $message = "Erro ao excluir recorrência: " . $e->getMessage();
             $messageType = 'error';
         }
+    } elseif ($action == 'terminate_recurring' && isset($_POST['account_id'])) {
+        try {
+            $conn = $recurringModel->getConnection();
+            $conn->beginTransaction();
+
+            $aid = intval($_POST['account_id']);
+            $effective = $_POST['terminate_effective'] ?? 'tomorrow';
+            $cutoff = ($effective === 'today') ? date('Y-m-d') : date('Y-m-d', strtotime('+1 day'));
+
+            $verify = $conn->prepare("SELECT id FROM accounts WHERE id = :id AND user_id = :user_id AND is_recurring = 1");
+            $verify->execute([':id' => $aid, ':user_id' => $userId]);
+            $row = $verify->fetch(PDO::FETCH_ASSOC);
+            if (!$row) { throw new Exception('Conta recorrente não encontrada ou não pertence ao usuário'); }
+
+            $delFuture = $conn->prepare("DELETE FROM accounts WHERE recurring_parent_id = :parent_id AND user_id = :user_id AND status = 'pendente' AND due_date >= :cutoff");
+            $delFuture->execute([':parent_id' => $aid, ':user_id' => $userId, ':cutoff' => $cutoff]);
+
+            $updSetting = $conn->prepare("UPDATE recurring_settings SET is_active = 0, end_date = :cutoff, next_generation_date = NULL WHERE account_id = :account_id");
+            $updSetting->execute([':account_id' => $aid, ':cutoff' => $cutoff]);
+
+            $conn->commit();
+            $message = "Recorrência encerrada. Parcelas futuras removidas e histórico mantido.";
+            $messageType = 'success';
+        } catch (Exception $e) {
+            if ($recurringModel->getConnection()) { $recurringModel->getConnection()->rollBack(); }
+            $message = "Erro ao encerrar recorrência: " . $e->getMessage();
+            $messageType = 'error';
+        }
     }
 }
 
@@ -472,6 +500,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['action']) && $_GET['acti
                                             <i class="fas fa-pause"></i>
                                         </button>
                                     </form>
+                                    <button type="button" onclick="openTerminateModal(<?= $account['id'] ?>)" class="text-gray-700 hover:text-gray-900" title="Encerrar recorrência">
+                                        <i class="fas fa-stop-circle"></i>
+                                    </button>
                                     <?php else: ?>
                                     <form method="POST" class="inline">
                                         <input type="hidden" name="action" value="activate">
@@ -627,6 +658,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['action']) && $_GET['acti
                                             <i class="fas fa-pause"></i>
                                         </button>
                                     </form>
+                                    <button type="button" onclick="openTerminateModal(<?= $account['id'] ?>)" class="text-gray-700 hover:text-gray-900" title="Encerrar recorrência">
+                                        <i class="fas fa-stop-circle"></i>
+                                    </button>
                                     <?php else: ?>
                                     <form method="POST" class="inline">
                                         <input type="hidden" name="action" value="activate">
@@ -674,6 +708,24 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['action']) && $_GET['acti
             </div>
         </div>
     </div>
+
+    <div id="terminateModal" class="fixed inset-0 bg-black bg-opacity-30 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-lg w-full max-w-md p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">Encerrar recorrência</h3>
+            <p class="text-sm text-gray-600 mb-4">Escolha a partir de quando encerrar a recorrência.</p>
+            <div class="flex gap-3">
+                <button onclick="submitTerminate('today')" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">Hoje</button>
+                <button onclick="submitTerminate('tomorrow')" class="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700">A partir de amanhã</button>
+                <button onclick="closeTerminateModal()" class="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <form id="terminateForm" method="POST" class="hidden">
+        <input type="hidden" name="action" value="terminate_recurring">
+        <input type="hidden" name="account_id" id="terminate_account_id">
+        <input type="hidden" name="terminate_effective" id="terminate_effective" value="tomorrow">
+    </form>
 
     <script>
         function openEditModal(accountId) {
@@ -733,6 +785,24 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['action']) && $_GET['acti
             document.getElementById('nextInstances').onclick = () => {
                 if (instancesPage < data.pages) { instancesPage++; fetchInstances(instancesPage); }
             };
+        }
+        function openTerminateModal(id) {
+            document.getElementById('terminate_account_id').value = id;
+            const m = document.getElementById('terminateModal');
+            m.classList.remove('hidden');
+            m.classList.add('flex');
+            m.style.display = 'flex';
+        }
+        function closeTerminateModal() {
+            const m = document.getElementById('terminateModal');
+            m.classList.add('hidden');
+            m.classList.remove('flex');
+            m.style.display = 'none';
+        }
+        function submitTerminate(effect) {
+            document.getElementById('terminate_effective').value = effect;
+            document.getElementById('terminateForm').submit();
+            closeTerminateModal();
         }
     </script>
 </body>
