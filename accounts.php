@@ -1121,13 +1121,13 @@ if ($action == 'list') {
                                 <td class="px-6 py-4 text-sm text-gray-900">
                                     <?php
                                         $parentId = !empty($account['recurring_parent_id']) ? $account['recurring_parent_id'] : (intval($account['is_recurring']) === 1 ? $account['id'] : null);
-                                        $remainingInstallmentsDisplay = '<span class="text-gray-400 text-xs">-</span>';
+                                        $remainingInstallmentsDisplay = '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">-</span>';
                                         if ($parentId) {
                                             $recSet = $recurringModel->getByAccountId($parentId);
                                       $maxOccurrences = intval($recSet['max_occurrences'] ?? 0);
                                       $endDate = $recSet['end_date'] ?? null;
                                       if ($recSet && ($maxOccurrences <= 0) && empty($endDate)) {
-                                          $remainingInstallmentsDisplay = '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-600">sem data de término</span>';
+                                          $remainingInstallmentsDisplay = '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">sem data de término</span>';
                                       } else {
                                           $stmtPendingChildren = $recurringModel->getConnection()->prepare("SELECT COUNT(*) FROM accounts WHERE recurring_parent_id = :pid AND status = 'pendente'");
                                           $stmtPendingChildren->execute([':pid' => $parentId]);
@@ -1145,14 +1145,15 @@ if ($action == 'list') {
                                             $stmtTotal->execute([':uid' => $userId, ':type' => $account['type'], ':desc' => $account['description']]);
                                             $total = intval($stmtTotal->fetchColumn());
                                             if ($total <= 1) {
-                                                $remainingInstallmentsDisplay = '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-600">parcela única</span>';
+                                                $remainingInstallmentsDisplay = '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">parcela única</span>';
                                             } else {
                                                 $stmtPending = $pdo->prepare("SELECT COUNT(*) FROM accounts WHERE user_id = :uid AND type = :type AND description = :desc AND status = 'pendente'");
                                                 $stmtPending->execute([':uid' => $userId, ':type' => $account['type'], ':desc' => $account['description']]);
                                                 $remainingInstallmentsDisplay = intval($stmtPending->fetchColumn());
                                             }
                                         }
-                                        echo $remainingInstallmentsDisplay;
+                                        $label = is_numeric($remainingInstallmentsDisplay) ? (string)$remainingInstallmentsDisplay : strip_tags((string)$remainingInstallmentsDisplay);
+                                         echo '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">' . htmlspecialchars($label) . '</span>';
                                     ?>
                                 </td>
                                 <td class="px-6 py-4">
@@ -1283,13 +1284,13 @@ if ($action == 'list') {
                                 <td class="px-6 py-4 text-sm text-gray-900">
                                     <?php
                                         $parentId = !empty($account['recurring_parent_id']) ? $account['recurring_parent_id'] : (intval($account['is_recurring']) === 1 ? $account['id'] : null);
-                                        $remainingInstallmentsDisplay = '<span class="text-gray-400 text-xs">-</span>';
+                                        $remainingInstallmentsDisplay = '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">-</span>';
                                         if ($parentId) {
                                             $recSet = $recurringModel->getByAccountId($parentId);
                                             $maxOccurrences = intval($recSet['max_occurrences'] ?? 0);
                                             $endDate = $recSet['end_date'] ?? null;
                                             if ($recSet && ($maxOccurrences <= 0) && empty($endDate)) {
-                                                $remainingInstallmentsDisplay = '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-600">sem data de término</span>';
+                                                $remainingInstallmentsDisplay = '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">sem data de término</span>';
                                             } else {
                                                 $stmtPendingChildren = $recurringModel->getConnection()->prepare("SELECT COUNT(*) FROM accounts WHERE recurring_parent_id = :pid AND status = 'pendente'");
                                                 $stmtPendingChildren->execute([':pid' => $parentId]);
@@ -1307,14 +1308,15 @@ if ($action == 'list') {
                                             $stmtTotal->execute([':uid' => $userId, ':type' => $account['type'], ':desc' => $account['description']]);
                                             $total = intval($stmtTotal->fetchColumn());
                                             if ($total <= 1) {
-                                                $remainingInstallmentsDisplay = '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-600">parcela única</span>';
+                                                $remainingInstallmentsDisplay = '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">parcela única</span>';
                                             } else {
                                                 $stmtPending = $pdo->prepare("SELECT COUNT(*) FROM accounts WHERE user_id = :uid AND type = :type AND description = :desc AND status = 'pendente'");
                                                 $stmtPending->execute([':uid' => $userId, ':type' => $account['type'], ':desc' => $account['description']]);
                                                 $remainingInstallmentsDisplay = intval($stmtPending->fetchColumn());
                                             }
                                         }
-                                        echo $remainingInstallmentsDisplay;
+                                        $label = is_numeric($remainingInstallmentsDisplay) ? (string)$remainingInstallmentsDisplay : strip_tags((string)$remainingInstallmentsDisplay);
+                                          echo '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">' . htmlspecialchars($label) . '</span>';
                                     ?>
                                 </td>
                                 <td class="px-6 py-4">
@@ -1415,13 +1417,13 @@ if ($action == 'list') {
                             <td class="px-6 py-4 text-sm text-gray-900">
                                 <?php
                                     $parentId = !empty($account['recurring_parent_id']) ? $account['recurring_parent_id'] : (intval($account['is_recurring']) === 1 ? $account['id'] : null);
-                                    $remainingInstallmentsDisplay = '<span class="text-gray-400 text-xs">-</span>';
+                                    $remainingInstallmentsDisplay = '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">-</span>';
                                     if ($parentId) {
                                         $recSet = $recurringModel->getByAccountId($parentId);
                                         $maxOccurrences = intval($recSet['max_occurrences'] ?? 0);
                                         $endDate = $recSet['end_date'] ?? null;
                                         if ($recSet && ($maxOccurrences <= 0) && empty($endDate)) {
-                                            $remainingInstallmentsDisplay = '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-600">sem data de término</span>';
+                                            $remainingInstallmentsDisplay = '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">sem data de término</span>';
                                         } else {
                                             $stmtPendingChildren = $recurringModel->getConnection()->prepare("SELECT COUNT(*) FROM accounts WHERE recurring_parent_id = :pid AND status = 'pendente'");
                                             $stmtPendingChildren->execute([':pid' => $parentId]);
@@ -1439,14 +1441,15 @@ if ($action == 'list') {
                                         $stmtTotal->execute([':uid' => $userId, ':type' => $account['type'], ':desc' => $account['description']]);
                                         $total = intval($stmtTotal->fetchColumn());
                                         if ($total <= 1) {
-                                            $remainingInstallmentsDisplay = '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-600">parcela única</span>';
+                                            $remainingInstallmentsDisplay = '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">parcela única</span>';
                                         } else {
                                             $stmtPending = $pdo->prepare("SELECT COUNT(*) FROM accounts WHERE user_id = :uid AND type = :type AND description = :desc AND status = 'pendente'");
                                             $stmtPending->execute([':uid' => $userId, ':type' => $account['type'], ':desc' => $account['description']]);
                                             $remainingInstallmentsDisplay = intval($stmtPending->fetchColumn());
                                         }
                                     }
-                                    echo $remainingInstallmentsDisplay;
+                                    $label = is_numeric($remainingInstallmentsDisplay) ? (string)$remainingInstallmentsDisplay : strip_tags((string)$remainingInstallmentsDisplay);
+                                      echo '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">' . htmlspecialchars($label) . '</span>';
                                 ?>
                             </td>
                             <td class="px-6 py-4">
@@ -1709,7 +1712,7 @@ if ($action == 'list') {
                                 <td class="px-6 py-4 text-sm text-gray-900">
                                     <?php
                                         $parentId = !empty($account['recurring_parent_id']) ? $account['recurring_parent_id'] : (intval($account['is_recurring']) === 1 ? $account['id'] : null);
-                                        $remainingInstallmentsDisplay = '<span class="text-gray-400 text-xs">-</span>';
+                                        $remainingInstallmentsDisplay = '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">-</span>';
                                         if ($parentId) {
                                             $stmtPendingChildren = $recurringModel->getConnection()->prepare("SELECT COUNT(*) FROM accounts WHERE recurring_parent_id = :pid AND status = 'pendente'");
                                                   $stmtPendingChildren->execute([':pid' => $parentId]);
@@ -1726,14 +1729,15 @@ if ($action == 'list') {
                                             $stmtTotal->execute([':uid' => $userId, ':type' => $account['type'], ':desc' => $account['description']]);
                                             $total = intval($stmtTotal->fetchColumn());
                                             if ($total <= 1) {
-                                                $remainingInstallmentsDisplay = '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-600">parcela única</span>';
+                                                $remainingInstallmentsDisplay = '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">parcela única</span>';
                                             } else {
                                                 $stmtPending = $pdo->prepare("SELECT COUNT(*) FROM accounts WHERE user_id = :uid AND type = :type AND description = :desc AND status = 'pendente'");
                                                 $stmtPending->execute([':uid' => $userId, ':type' => $account['type'], ':desc' => $account['description']]);
                                                 $remainingInstallmentsDisplay = intval($stmtPending->fetchColumn());
                                             }
                                         }
-                                        echo $remainingInstallmentsDisplay;
+                                        $label = is_numeric($remainingInstallmentsDisplay) ? (string)$remainingInstallmentsDisplay : strip_tags((string)$remainingInstallmentsDisplay);
+                                           echo '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">' . htmlspecialchars($label) . '</span>';
                                     ?>
                                 </td>
                                 <td class="px-6 py-4">
@@ -1870,7 +1874,7 @@ if ($action == 'list') {
                                       $maxOccurrences = intval($recSet['max_occurrences'] ?? 0);
                                       $endDate = $recSet['end_date'] ?? null;
                                       if ($recSet && ($maxOccurrences <= 0) && empty($endDate)) {
-                                          $remainingInstallmentsDisplay = '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-600">sem data de término</span>';
+                                          $remainingInstallmentsDisplay = '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">sem data de término</span>';
                                       } else {
                                           $stmtPendingChildren = $recurringModel->getConnection()->prepare("SELECT COUNT(*) FROM accounts WHERE recurring_parent_id = :pid AND status = 'pendente'");
                                           $stmtPendingChildren->execute([':pid' => $parentId]);
@@ -1888,14 +1892,15 @@ if ($action == 'list') {
                                             $stmtTotal->execute([':uid' => $userId, ':type' => $account['type'], ':desc' => $account['description']]);
                                             $total = intval($stmtTotal->fetchColumn());
                                             if ($total <= 1) {
-                                                $remainingInstallmentsDisplay = '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-600">parcela única</span>';
+                                                $remainingInstallmentsDisplay = '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">parcela única</span>';
                                             } else {
                                                 $stmtPending = $pdo->prepare("SELECT COUNT(*) FROM accounts WHERE user_id = :uid AND type = :type AND description = :desc AND status = 'pendente'");
                                                 $stmtPending->execute([':uid' => $userId, ':type' => $account['type'], ':desc' => $account['description']]);
                                                 $remainingInstallmentsDisplay = intval($stmtPending->fetchColumn());
                                             }
                                         }
-                                        echo $remainingInstallmentsDisplay;
+                                        $label = is_numeric($remainingInstallmentsDisplay) ? (string)$remainingInstallmentsDisplay : strip_tags((string)$remainingInstallmentsDisplay);
+                                        echo '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">' . htmlspecialchars($label) . '</span>';
                                     ?>
                                 </td>
                                 <td class="px-6 py-4">
@@ -2013,14 +2018,15 @@ if ($action == 'list') {
                                         $stmtTotal->execute([':uid' => $userId, ':type' => $account['type'], ':desc' => $account['description']]);
                                         $total = intval($stmtTotal->fetchColumn());
                                         if ($total <= 1) {
-                                            $remainingInstallmentsDisplay = '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-600">parcela única</span>';
+                                            $remainingInstallmentsDisplay = '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">parcela única</span>';
                                         } else {
                                             $stmtPending = $pdo->prepare("SELECT COUNT(*) FROM accounts WHERE user_id = :uid AND type = :type AND description = :desc AND status = 'pendente'");
                                             $stmtPending->execute([':uid' => $userId, ':type' => $account['type'], ':desc' => $account['description']]);
                                             $remainingInstallmentsDisplay = intval($stmtPending->fetchColumn());
                                         }
                                     }
-                                    echo $remainingInstallmentsDisplay;
+                                    $label = is_numeric($remainingInstallmentsDisplay) ? (string)$remainingInstallmentsDisplay : strip_tags((string)$remainingInstallmentsDisplay);
+                                    echo '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">' . htmlspecialchars($label) . '</span>';
                                 ?>
                             </td>
                             <td class="px-6 py-4">
