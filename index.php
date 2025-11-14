@@ -16,6 +16,13 @@ $recurringModel = new RecurringSetting();
 
 $userId = $_SESSION['user_id'];
 
+// Executar rotina diária de recorrências (global, uma vez por dia)
+try {
+    $recurringModel->runDailyGlobalProcessingIfNeeded();
+} catch (Exception $e) {
+    error_log("Erro na rotina diária de recorrências: " . $e->getMessage());
+}
+
 // Executar manutenção leve das contas recorrentes (em background)
 try {
     $recurringModel->lightMaintenance($userId);

@@ -668,5 +668,64 @@ class RecurringSetting {
     public function getConnection() {
         return $this->conn;
     }
+
+    // Executa rotina global diária de geração de recorrências, uma vez por dia
+    public function runDailyGlobalProcessingIfNeeded() {
+        $storageFile = dirname(__DIR__) . '/uploads/daily_recurring_run.json';
+        $today = date('Y-m-d');
+        $lastRunDate = null;
+
+        if (file_exists($storageFile)) {
+            $raw = @file_get_contents($storageFile);
+            if ($raw) {
+                $json = json_decode($raw, true);
+                if (is_array($json) && !empty($json['last_run_date'])) {
+                    $lastRunDate = $json['last_run_date'];
+                }
+            }
+        }
+
+        if ($lastRunDate === $today) {
+            return [
+                'ran' => false,
+                'processed' => 0,
+                'generated' => 0,
+                'errors' => 0,
+            ];
+        }
+
+        $accountsToProcess = $this->getAccountsNeedingGeneration();
+        $processed = count($accountsToProcess);
+        $generatedTotal = 0;
+        $errors = 0;
+
+        foreach ($accountsToProcess as $account) {
+            try {
+                $g = $this->generateNextOccurrences($account['account_id'], $account['user_id']);
+                if ($g > 0) {
+                    $generatedTotal += $g;
+                }
+            } catch (\Exception $e) {
+                $errors++;
+                error_log("Erro ao processar recorrência diária: " . $e->getMessage());
+            }
+        }
+
+        $payload = [
+            'last_run_date' => $today,
+            'processed' => $processed,
+            'generated' => $generatedTotal,
+            'errors' => $errors,
+            'timestamp' => date('c'),
+        ];
+        @file_put_contents($storageFile, json_encode($payload), LOCK_EX);
+
+        return [
+            'ran' => true,
+            'processed' => $processed,
+            'generated' => $generatedTotal,
+            'errors' => $errors,
+        ];
+    }
 }
 ?>
