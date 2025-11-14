@@ -1121,6 +1121,12 @@ if ($action == 'list') {
                                 <td class="px-6 py-4 text-sm text-gray-900">
                                     <?php
                                         $parentId = !empty($account['recurring_parent_id']) ? $account['recurring_parent_id'] : (intval($account['is_recurring']) === 1 ? $account['id'] : null);
+                                        if (!$parentId) {
+                                            $stmtFindParent = $pdo->prepare("SELECT id FROM accounts WHERE user_id = :uid AND description = :desc AND is_recurring = 1 ORDER BY id DESC LIMIT 1");
+                                            $stmtFindParent->execute([':uid' => $userId, ':desc' => $account['description']]);
+                                            $rowParent = $stmtFindParent->fetch(PDO::FETCH_ASSOC);
+                                            $parentId = $rowParent['id'] ?? null;
+                                        }
                                         $remainingInstallmentsDisplay = '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">-</span>';
                                         if ($parentId) {
                                             $recSet = $recurringModel->getByAccountId($parentId);
@@ -1285,6 +1291,12 @@ if ($action == 'list') {
                                 <td class="px-6 py-4 text-sm text-gray-900">
                                     <?php
                                         $parentId = !empty($account['recurring_parent_id']) ? $account['recurring_parent_id'] : (intval($account['is_recurring']) === 1 ? $account['id'] : null);
+                                        if (!$parentId) {
+                                            $stmtFindParent = $pdo->prepare("SELECT id FROM accounts WHERE user_id = :uid AND description = :desc AND is_recurring = 1 ORDER BY id DESC LIMIT 1");
+                                            $stmtFindParent->execute([':uid' => $userId, ':desc' => $account['description']]);
+                                            $rowParent = $stmtFindParent->fetch(PDO::FETCH_ASSOC);
+                                            $parentId = $rowParent['id'] ?? null;
+                                        }
                                         $remainingInstallmentsDisplay = '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">-</span>';
                                         if ($parentId) {
                                                 $recSet = $recurringModel->getByAccountId($parentId);
@@ -1419,6 +1431,12 @@ if ($action == 'list') {
                             <td class="px-6 py-4 text-sm text-gray-900">
                                 <?php
                                     $parentId = !empty($account['recurring_parent_id']) ? $account['recurring_parent_id'] : (intval($account['is_recurring']) === 1 ? $account['id'] : null);
+                                    if (!$parentId) {
+                                        $stmtFindParent = $pdo->prepare("SELECT id FROM accounts WHERE user_id = :uid AND description = :desc AND is_recurring = 1 ORDER BY id DESC LIMIT 1");
+                                        $stmtFindParent->execute([':uid' => $userId, ':desc' => $account['description']]);
+                                        $rowParent = $stmtFindParent->fetch(PDO::FETCH_ASSOC);
+                                        $parentId = $rowParent['id'] ?? null;
+                                    }
                                     $remainingInstallmentsDisplay = '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">-</span>';
                                     if ($parentId) {
                                         $recSet = $recurringModel->getByAccountId($parentId);
@@ -1715,6 +1733,12 @@ if ($action == 'list') {
                                 <td class="px-6 py-4 text-sm text-gray-900">
                                     <?php
                                         $parentId = !empty($account['recurring_parent_id']) ? $account['recurring_parent_id'] : (intval($account['is_recurring']) === 1 ? $account['id'] : null);
+                                        if (!$parentId) {
+                                            $stmtFindParent = $pdo->prepare("SELECT id FROM accounts WHERE user_id = :uid AND description = :desc AND is_recurring = 1 ORDER BY id DESC LIMIT 1");
+                                            $stmtFindParent->execute([':uid' => $userId, ':desc' => $account['description']]);
+                                            $rowParent = $stmtFindParent->fetch(PDO::FETCH_ASSOC);
+                                            $parentId = $rowParent['id'] ?? null;
+                                        }
                                         $remainingInstallmentsDisplay = '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">-</span>';
                                         if ($parentId) {
                                                 $recSet = $recurringModel->getByAccountId($parentId);
@@ -1879,6 +1903,12 @@ if ($action == 'list') {
                                 <td class="px-6 py-4 text-sm text-gray-900">
                                     <?php
                                         $parentId = !empty($account['recurring_parent_id']) ? $account['recurring_parent_id'] : (intval($account['is_recurring']) === 1 ? $account['id'] : null);
+                                        if (!$parentId) {
+                                            $stmtFindParent = $pdo->prepare("SELECT id FROM accounts WHERE user_id = :uid AND description = :desc AND is_recurring = 1 ORDER BY id DESC LIMIT 1");
+                                            $stmtFindParent->execute([':uid' => $userId, ':desc' => $account['description']]);
+                                            $rowParent = $stmtFindParent->fetch(PDO::FETCH_ASSOC);
+                                            $parentId = $rowParent['id'] ?? null;
+                                        }
                                         $remainingInstallmentsDisplay = '<span class="text-gray-400 text-xs">-</span>';
                                         if ($parentId) {
                                       $recSet = $recurringModel->getByAccountId($parentId);
@@ -2013,6 +2043,12 @@ if ($action == 'list') {
                                 <td class="px-6 py-4 text-sm text-gray-900">
                                     <?php
                                         $parentId = !empty($account['recurring_parent_id']) ? $account['recurring_parent_id'] : (intval($account['is_recurring']) === 1 ? $account['id'] : null);
+                                        if (!$parentId) {
+                                            $stmtFindParent = $pdo->prepare("SELECT id FROM accounts WHERE user_id = :uid AND description = :desc AND is_recurring = 1 ORDER BY id DESC LIMIT 1");
+                                            $stmtFindParent->execute([':uid' => $userId, ':desc' => $account['description']]);
+                                            $rowParent = $stmtFindParent->fetch(PDO::FETCH_ASSOC);
+                                            $parentId = $rowParent['id'] ?? null;
+                                        }
                                         $remainingInstallmentsDisplay = '<span class="text-gray-400 text-xs">-</span>';
                                         if ($parentId) {
                                                 $recSet = $recurringModel->getByAccountId($parentId);
