@@ -1126,7 +1126,8 @@ if ($action == 'list') {
                                             $recSet = $recurringModel->getByAccountId($parentId);
                                       $maxOccurrences = intval($recSet['max_occurrences'] ?? 0);
                                       $endDate = $recSet['end_date'] ?? null;
-                                      if ($recSet && ($maxOccurrences <= 0) && empty($endDate)) {
+                                      $noEnd = empty($endDate) || $endDate === '0000-00-00';
+                                      if ($recSet && ($maxOccurrences <= 0) && $noEnd) {
                                           $remainingInstallmentsDisplay = '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">sem data de término</span>';
                                       } else {
                                           $stmtPendingChildren = $recurringModel->getConnection()->prepare("SELECT COUNT(*) FROM accounts WHERE recurring_parent_id = :pid AND status = 'pendente'");
@@ -1289,7 +1290,8 @@ if ($action == 'list') {
                                             $recSet = $recurringModel->getByAccountId($parentId);
                                             $maxOccurrences = intval($recSet['max_occurrences'] ?? 0);
                                             $endDate = $recSet['end_date'] ?? null;
-                                            if ($recSet && ($maxOccurrences <= 0) && empty($endDate)) {
+                                            $noEnd = empty($endDate) || $endDate === '0000-00-00';
+                                            if ($recSet && ($maxOccurrences <= 0) && $noEnd) {
                                                 $remainingInstallmentsDisplay = '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">sem data de término</span>';
                                             } else {
                                                 $stmtPendingChildren = $recurringModel->getConnection()->prepare("SELECT COUNT(*) FROM accounts WHERE recurring_parent_id = :pid AND status = 'pendente'");
@@ -1422,7 +1424,8 @@ if ($action == 'list') {
                                         $recSet = $recurringModel->getByAccountId($parentId);
                                         $maxOccurrences = intval($recSet['max_occurrences'] ?? 0);
                                         $endDate = $recSet['end_date'] ?? null;
-                                        if ($recSet && ($maxOccurrences <= 0) && empty($endDate)) {
+                                        $noEnd = empty($endDate) || $endDate === '0000-00-00';
+                                        if ($recSet && ($maxOccurrences <= 0) && $noEnd) {
                                             $remainingInstallmentsDisplay = '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">sem data de término</span>';
                                         } else {
                                             $stmtPendingChildren = $recurringModel->getConnection()->prepare("SELECT COUNT(*) FROM accounts WHERE recurring_parent_id = :pid AND status = 'pendente'");
@@ -1717,7 +1720,8 @@ if ($action == 'list') {
                                             $recSet = $recurringModel->getByAccountId($parentId);
                                             $maxOccurrences = intval($recSet['max_occurrences'] ?? 0);
                                             $endDate = $recSet['end_date'] ?? null;
-                                            if ($recSet && ($maxOccurrences <= 0) && empty($endDate)) {
+                                            $noEnd = empty($endDate) || $endDate === '0000-00-00';
+                                            if ($recSet && ($maxOccurrences <= 0) && $noEnd) {
                                                 $remainingInstallmentsDisplay = '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">sem data de término</span>';
                                             } else {
                                                 $stmtPendingChildren = $recurringModel->getConnection()->prepare("SELECT COUNT(*) FROM accounts WHERE recurring_parent_id = :pid AND status = 'pendente'");
@@ -1880,7 +1884,8 @@ if ($action == 'list') {
                                             $recSet = $recurringModel->getByAccountId($parentId);
                                       $maxOccurrences = intval($recSet['max_occurrences'] ?? 0);
                                       $endDate = $recSet['end_date'] ?? null;
-                                      if ($recSet && ($maxOccurrences <= 0) && empty($endDate)) {
+                                      $noEnd = empty($endDate) || $endDate === '0000-00-00';
+                                      if ($recSet && ($maxOccurrences <= 0) && $noEnd) {
                                           $remainingInstallmentsDisplay = '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">sem data de término</span>';
                                       } else {
                                           $stmtPendingChildren = $recurringModel->getConnection()->prepare("SELECT COUNT(*) FROM accounts WHERE recurring_parent_id = :pid AND status = 'pendente'");
@@ -2013,7 +2018,8 @@ if ($action == 'list') {
                                             $recSet = $recurringModel->getByAccountId($parentId);
                                             $maxOccurrences = intval($recSet['max_occurrences'] ?? 0);
                                             $endDate = $recSet['end_date'] ?? null;
-                                            if ($recSet && ($maxOccurrences <= 0) && empty($endDate)) {
+                                            $noEnd = empty($endDate) || $endDate === '0000-00-00';
+                                            if ($recSet && ($maxOccurrences <= 0) && $noEnd) {
                                                 $remainingInstallmentsDisplay = '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">sem data de término</span>';
                                             } else {
                                                 $stmtPendingChildren = $recurringModel->getConnection()->prepare("SELECT COUNT(*) FROM accounts WHERE recurring_parent_id = :pid AND status = 'pendente'");

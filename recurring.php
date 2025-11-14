@@ -461,7 +461,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['action']) && $_GET['acti
                             $metaStmt = $recurringModel->getConnection()->prepare("SELECT end_date, max_occurrences FROM recurring_settings WHERE account_id = :pid");
                             $metaStmt->execute([':pid' => $account['id']]);
                             $meta = $metaStmt->fetch(PDO::FETCH_ASSOC) ?: ['end_date' => null, 'max_occurrences' => null];
-                            $isIndeterminate = empty($meta['end_date']) && empty($meta['max_occurrences']);
+                            $endDateRaw = $meta['end_date'] ?? null;
+                            $noEnd = empty($endDateRaw) || $endDateRaw === '0000-00-00';
+                            $isIndeterminate = $noEnd && empty($meta['max_occurrences']);
                             $numParcelas = $isIndeterminate ? 'sem data de término' : (int)$meta['max_occurrences'];
                             ?>
                             <td class="px-6 py-4 text-sm text-gray-900">
@@ -619,7 +621,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['action']) && $_GET['acti
                             $metaStmt = $recurringModel->getConnection()->prepare("SELECT end_date, max_occurrences FROM recurring_settings WHERE account_id = :pid");
                             $metaStmt->execute([':pid' => $account['id']]);
                             $meta = $metaStmt->fetch(PDO::FETCH_ASSOC) ?: ['end_date' => null, 'max_occurrences' => null];
-                            $isIndeterminate = empty($meta['end_date']) && empty($meta['max_occurrences']);
+                            $endDateRaw = $meta['end_date'] ?? null;
+                            $noEnd = empty($endDateRaw) || $endDateRaw === '0000-00-00';
+                            $isIndeterminate = $noEnd && empty($meta['max_occurrences']);
                             $numParcelas = $isIndeterminate ? 'sem data de término' : (int)$meta['max_occurrences'];
                             ?>
                             <td class="px-6 py-4 text-sm text-gray-900">
