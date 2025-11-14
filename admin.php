@@ -292,6 +292,20 @@ require_once 'partials/header.php';
                 </div>
             </div>
         </div>
+        <!-- Execução automática de recorrências (cron) -->
+        <div class="mt-8 bg-white rounded-lg shadow-md p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">
+                <i class="fas fa-calendar-alt text-blue-600 mr-2"></i>
+                Agendamento de Processamento de Recorrências (cron)
+            </h3>
+            <p class="text-sm text-gray-700 mb-3">
+                Para executar diariamente a geração de parcelas de contas recorrentes, configure um cron no servidor:
+            </p>
+            <pre class="bg-gray-100 p-3 rounded text-xs overflow-x-auto"><code>0 6 * * * /usr/bin/php <?= htmlspecialchars(realpath(__DIR__ . '/cron/process_recurring.php')) ?></code></pre>
+            <p class="text-xs text-gray-500 mt-2">
+                Dica: ajuste o horário conforme sua necessidade. O caminho acima é gerado com base na instalação atual.
+            </p>
+        </div>
     </div>
 
     <script>

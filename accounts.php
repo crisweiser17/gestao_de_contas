@@ -169,7 +169,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 // Capturar estado atual antes de atualizar (para detectar pai/filho e comparar URL)
                 $existingAccount = $accountModel->getById($accountId, $userId);
 
-                if ($accountModel->update($accountId, $data, $userId)) {
+                // Bloquear edição de instâncias passadas
+                $isInstance = ($existingAccount && !empty($existingAccount['recurring_parent_id']));
+                $dueDate = $existingAccount['due_date'] ?? null;
+                if ($isInstance && $dueDate && strtotime($dueDate) < strtotime(date('Y-m-d'))) {
+                    $errors[] = 'Edição bloqueada: apenas instâncias futuras podem ser editadas.';
+                }
+
+                if (empty($errors) && $accountModel->update($accountId, $data, $userId)) {
                     // Gerenciar configuração de recorrência ao editar
                     $existingSetting = $recurringModel->getByAccountId($accountId);
                     if ($data['is_recurring']) {
@@ -254,6 +261,77 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 $nextDate = $recurringModel->calculateNextDate($nextDate, $freqType, $freqInterval, $newDue);
                             }
                         }
+
+                        // Recalcular futuras instâncias conforme end_date e max_occurrences
+                        try {
+                            $targetEnd = isset($endDate) ? $endDate : ($existingSetting['end_date'] ?? null);
+                            $targetMax = isset($maxOcc) ? $maxOcc : ($existingSetting['max_occurrences'] ?? null);
+
+                            // 1) Remover pendentes fora da nova data final
+                            if (!empty($targetEnd)) {
+                                $delStmt = $pdo->prepare("DELETE FROM accounts WHERE recurring_parent_id = :parent_id AND user_id = :user_id AND status = 'pendente' AND due_date > :end_date");
+                                $delStmt->execute([':parent_id' => $accountId, ':user_id' => $userId, ':end_date' => $targetEnd]);
+                            }
+
+                            // 2) Ajustar quantidade máxima de parcelas futuras
+                            $fetchFuture = $pdo->prepare("SELECT id, due_date FROM accounts WHERE recurring_parent_id = :parent_id AND user_id = :user_id AND status = 'pendente' AND due_date >= CURDATE() ORDER BY due_date ASC");
+                            $fetchFuture->execute([':parent_id' => $accountId, ':user_id' => $userId]);
+                            $futureChildren = $fetchFuture->fetchAll(PDO::FETCH_ASSOC);
+                            $currentCount = count($futureChildren);
+
+                            // Remover excedentes se necessário
+                            if (!empty($targetMax) && $currentCount > intval($targetMax)) {
+                                $excess = array_slice($futureChildren, intval($targetMax));
+                                $deleteById = $pdo->prepare("DELETE FROM accounts WHERE id = :id AND user_id = :user_id AND status = 'pendente'");
+                                foreach ($excess as $child) {
+                                    $deleteById->execute([':id' => $child['id'], ':user_id' => $userId]);
+                                }
+                                // Atualizar a lista após remoção
+                                $fetchFuture->execute([':parent_id' => $accountId, ':user_id' => $userId]);
+                                $futureChildren = $fetchFuture->fetchAll(PDO::FETCH_ASSOC);
+                                $currentCount = count($futureChildren);
+                            }
+
+                            // Gerar faltantes até alcançar targetMax respeitando targetEnd
+                            if (!empty($targetMax) && $currentCount < intval($targetMax)) {
+                                $needed = intval($targetMax) - $currentCount;
+                                $lastDate = $currentCount > 0 ? $futureChildren[$currentCount - 1]['due_date'] : ($data['due_date'] ?? null);
+                                if (!$lastDate) { $lastDate = $existingAccount['due_date'] ?? date('Y-m-d'); }
+
+                                $insertStmt = $pdo->prepare("INSERT INTO accounts (user_id, category_id, description, amount, due_date, type, status, url, is_recurring, recurring_parent_id) VALUES (:user_id, :category_id, :description, :amount, :due_date, :type, 'pendente', :url, 0, :parent_id)");
+
+                                for ($i = 0; $i < $needed; $i++) {
+                                    $nextDue = $recurringModel->calculateNextDate($lastDate, $freqType, $freqInterval, $data['due_date'] ?? $existingAccount['due_date']);
+                                    if (!empty($targetEnd) && $nextDue > $targetEnd) { break; }
+
+                                    $insertStmt->execute([
+                                        ':user_id' => $userId,
+                                        ':category_id' => $existingAccount['category_id'] ?? $data['category_id'] ?? null,
+                                        ':description' => $existingAccount['description'] ?? $data['description'] ?? '',
+                                        ':amount' => $existingAccount['amount'] ?? $data['amount'] ?? 0,
+                                        ':due_date' => $nextDue,
+                                        ':type' => $existingAccount['type'] ?? $data['type'] ?? 'despesa',
+                                        ':url' => $existingAccount['url'] ?? $data['url'] ?? null,
+                                        ':parent_id' => $accountId,
+                                    ]);
+
+                                    $lastDate = $nextDue;
+                                    $currentCount++;
+                                }
+                            }
+
+                            // 3) Atualizar próxima data de geração com base no último futuro
+                            $referenceDate = null;
+                            if (!empty($futureChildren)) {
+                                $referenceDate = $futureChildren[count($futureChildren) - 1]['due_date'];
+                            }
+                            if (!$referenceDate) { $referenceDate = $data['due_date'] ?? $existingAccount['due_date'] ?? date('Y-m-d'); }
+                            $nextGenDate = $recurringModel->calculateNextDate($referenceDate, $freqType, $freqInterval, $data['due_date'] ?? $existingAccount['due_date']);
+                            $recurringModel->updateNextGenerationDate($accountId, $nextGenDate);
+                        } catch (Exception $e) {
+                            // Silenciar falhas de manutenção leve na edição
+                        }
+
                     } else if ($isInstance && $applySharedToParent) {
                         // Aplicar campos compartilhados ao pai
                         $parentId = $existingAccount['recurring_parent_id'];
@@ -2021,6 +2099,27 @@ if ($action == 'list') {
                           $showOptions = ($account['is_recurring'] ?? false);
                           $showCustom = ($freqTypeVal === 'personalizado');
                         ?>
+
+                        <?php 
+                          // Exibir apenas ao editar o pai da recorrência
+                          if ($action === 'edit' && (empty($account['recurring_parent_id']) && intval($account['is_recurring']) === 1)) {
+                              $nextGen = $recurringSetting['next_generation_date'] ?? null;
+                              $stmtGen = $pdo->prepare("SELECT COUNT(*) AS total FROM accounts WHERE recurring_parent_id = :pid AND user_id = :uid");
+                              $stmtGen->execute([':pid' => $account['id'], ':uid' => $userId]);
+                              $generatedCount = (int)($stmtGen->fetch(PDO::FETCH_ASSOC)['total'] ?? 0);
+                              $nextGenFmt = $nextGen ? date('d/m/Y', strtotime($nextGen)) : 'Agora';
+                          ?>
+                          <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-800">
+                            <div class="flex items-center mb-1">
+                              <i class="fas fa-calendar-plus mr-2"></i>
+                              <span><strong>Próxima geração:</strong> <?= $nextGenFmt ?></span>
+                            </div>
+                            <div class="flex items-center">
+                              <i class="fas fa-layer-group mr-2"></i>
+                              <span><strong>Geradas:</strong> <?= $generatedCount ?></span>
+                            </div>
+                          </div>
+                        <?php } ?>
 
                         <div id="recurring_options" class="<?= $showOptions ? '' : 'hidden' ?> grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg">
                             <div>
