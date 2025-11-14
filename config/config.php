@@ -97,7 +97,7 @@ if ($environment === 'PROD') {
 
 // Nome da aplicação
 define('APP_NAME', 'Gestão de Contas');
-define('APP_VERSION', '1.0.0');
+define('APP_VERSION', '1.0.1');
 
 // Configurações de timezone
 date_default_timezone_set('America/Sao_Paulo');
