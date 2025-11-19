@@ -176,12 +176,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 // Capturar estado atual antes de atualizar (para detectar pai/filho e comparar URL)
                 $existingAccount = $accountModel->getById($accountId, $userId);
 
-                // Bloquear edição de instâncias passadas
                 $isInstance = ($existingAccount && !empty($existingAccount['recurring_parent_id']));
-                $dueDate = $existingAccount['due_date'] ?? null;
-                if ($isInstance && $dueDate && strtotime($dueDate) < strtotime(date('Y-m-d'))) {
-                    $errors[] = 'Edição bloqueada: apenas instâncias futuras podem ser editadas.';
-                }
 
                 if (empty($errors) && $accountModel->update($accountId, $data, $userId)) {
                     // Gerenciar configuração de recorrência ao editar
