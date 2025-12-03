@@ -99,6 +99,12 @@ $totalBalance = $accountModel->getCurrentBalance($userId);
 
 // Últimas transações
 $recentTransactions = $accountModel->getRecentTransactions($userId, 10);
+// Onboarding: detectar se o usuário não possui categorias
+try {
+    $userCategories = $categoryModel->getByUserId($userId);
+} catch (Exception $e) {
+    $userCategories = [];
+}
 ?>
 
 <!DOCTYPE html>
@@ -126,6 +132,30 @@ $recentTransactions = $accountModel->getRecentTransactions($userId, 10);
     <?php require_once 'partials/header.php'; render_header('index'); ?>
 
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <?php if (empty($userCategories)): ?>
+        <div class="mb-6 p-4 rounded-md bg-yellow-50 text-yellow-800 border border-yellow-200">
+            <div class="flex items-start">
+                <div class="flex-shrink-0 mr-3">
+                    <i class="fas fa-seedling text-yellow-600"></i>
+                </div>
+                <div class="flex-1">
+                    <h3 class="text-md font-semibold mb-1">Bem-vindo! Comece configurando seu sistema</h3>
+                    <p class="text-sm mb-2">Siga estes passos para iniciar:</p>
+                    <ul class="list-decimal list-inside text-sm space-y-1">
+                        <li>Crie categorias macro de receita e despesa</li>
+                        <li>Cadastre suas contas recorrentes (a receber e a pagar)</li>
+                        <li>No dia a dia, cadastre as contas não recorrentes conforme surgem</li>
+                    </ul>
+                    <div class="mt-3">
+                        <a href="categories.php" class="inline-flex items-center bg-primary hover:bg-blue-700 text-white px-4 py-2 rounded-md">
+                            <i class="fas fa-folder-plus mr-2"></i>
+                            Ir para Categorias
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
         <!-- Cards de Resumo -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <!-- Mês/Ano Atual -->

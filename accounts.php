@@ -1120,12 +1120,12 @@ if ($action == 'list') {
                                             $stmtFindParent = $pdo->prepare("SELECT a.id
                                                 FROM accounts a
                                                 LEFT JOIN recurring_settings rs ON rs.account_id = a.id
-                                                WHERE a.user_id = :uid AND a.description = :desc AND a.is_recurring = 1
+                                                WHERE a.user_id = :uid AND a.description = :desc AND a.type = :type AND a.is_recurring = 1
                                                 ORDER BY 
                                                   CASE WHEN ((rs.max_occurrences IS NULL OR rs.max_occurrences = 0) AND (rs.end_date IS NULL OR CAST(rs.end_date AS CHAR(10)) = '0000-00-00')) THEN 0 ELSE 1 END ASC,
                                                   a.id DESC
                                                 LIMIT 1");
-                                            $stmtFindParent->execute([':uid' => $userId, ':desc' => $account['description']]);
+                                            $stmtFindParent->execute([':uid' => $userId, ':desc' => $account['description'], ':type' => $account['type']]);
                                             $rowParent = $stmtFindParent->fetch(PDO::FETCH_ASSOC);
                                             $parentId = $rowParent['id'] ?? null;
                                         }
@@ -1138,8 +1138,8 @@ if ($action == 'list') {
                                             $isIndeterminate = ($maxOccurrences <= 0) && $noEnd;
                                             $remainingInstallmentsDisplay = $isIndeterminate ? '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">sem data de término</span>' : (string)$maxOccurrences;
                                         } else {
-                                            $stmtFindAny = $pdo->prepare("SELECT a.id FROM accounts a WHERE a.user_id = :uid AND a.description = :desc AND a.is_recurring = 1 ORDER BY a.id DESC LIMIT 1");
-                                            $stmtFindAny->execute([':uid' => $userId, ':desc' => $account['description']]);
+                                            $stmtFindAny = $pdo->prepare("SELECT a.id FROM accounts a WHERE a.user_id = :uid AND a.description = :desc AND a.type = :type AND a.is_recurring = 1 ORDER BY a.id DESC LIMIT 1");
+                                            $stmtFindAny->execute([':uid' => $userId, ':desc' => $account['description'], ':type' => $account['type']]);
                                             $rowAny = $stmtFindAny->fetch(PDO::FETCH_ASSOC);
                                             if ($rowAny) {
                                                 $recSetX = $recurringModel->getByAccountId(intval($rowAny['id']));
@@ -1297,12 +1297,12 @@ if ($action == 'list') {
                                             $stmtFindParent = $pdo->prepare("SELECT a.id
                                                 FROM accounts a
                                                 LEFT JOIN recurring_settings rs ON rs.account_id = a.id
-                                                WHERE a.user_id = :uid AND a.description = :desc AND a.is_recurring = 1
+                                                WHERE a.user_id = :uid AND a.description = :desc AND a.type = :type AND a.is_recurring = 1
                                                 ORDER BY 
                                                   CASE WHEN ((rs.max_occurrences IS NULL OR rs.max_occurrences = 0) AND (rs.end_date IS NULL OR CAST(rs.end_date AS CHAR(10)) = '0000-00-00')) THEN 0 ELSE 1 END ASC,
                                                   a.id DESC
                                                 LIMIT 1");
-                                            $stmtFindParent->execute([':uid' => $userId, ':desc' => $account['description']]);
+                                            $stmtFindParent->execute([':uid' => $userId, ':desc' => $account['description'], ':type' => $account['type']]);
                                             $rowParent = $stmtFindParent->fetch(PDO::FETCH_ASSOC);
                                             $parentId = $rowParent['id'] ?? null;
                                         }
@@ -1315,8 +1315,8 @@ if ($action == 'list') {
                                             $isIndeterminate = ($maxOccurrences <= 0) && $noEnd;
                                             $remainingInstallmentsDisplay = $isIndeterminate ? '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">sem data de término</span>' : (string)$maxOccurrences;
                                         } else {
-                                            $stmtFindAny = $pdo->prepare("SELECT a.id FROM accounts a WHERE a.user_id = :uid AND a.description = :desc AND a.is_recurring = 1 ORDER BY a.id DESC LIMIT 1");
-                                            $stmtFindAny->execute([':uid' => $userId, ':desc' => $account['description']]);
+                                            $stmtFindAny = $pdo->prepare("SELECT a.id FROM accounts a WHERE a.user_id = :uid AND a.description = :desc AND a.type = :type AND a.is_recurring = 1 ORDER BY a.id DESC LIMIT 1");
+                                            $stmtFindAny->execute([':uid' => $userId, ':desc' => $account['description'], ':type' => $account['type']]);
                                             $rowAny = $stmtFindAny->fetch(PDO::FETCH_ASSOC);
                                             if ($rowAny) {
                                                 $recSetX = $recurringModel->getByAccountId(intval($rowAny['id']));
@@ -1444,12 +1444,12 @@ if ($action == 'list') {
                                         $stmtFindParent = $pdo->prepare("SELECT a.id
                                             FROM accounts a
                                             LEFT JOIN recurring_settings rs ON rs.account_id = a.id
-                                            WHERE a.user_id = :uid AND a.description = :desc AND a.is_recurring = 1
+                                            WHERE a.user_id = :uid AND a.description = :desc AND a.type = :type AND a.is_recurring = 1
                                             ORDER BY 
                                               CASE WHEN ((rs.max_occurrences IS NULL OR rs.max_occurrences = 0) AND (rs.end_date IS NULL OR CAST(rs.end_date AS CHAR(10)) = '0000-00-00')) THEN 0 ELSE 1 END ASC,
                                               a.id DESC
                                             LIMIT 1");
-                                        $stmtFindParent->execute([':uid' => $userId, ':desc' => $account['description']]);
+                                        $stmtFindParent->execute([':uid' => $userId, ':desc' => $account['description'], ':type' => $account['type']]);
                                         $rowParent = $stmtFindParent->fetch(PDO::FETCH_ASSOC);
                                         $parentId = $rowParent['id'] ?? null;
                                     }
@@ -1465,12 +1465,12 @@ if ($action == 'list') {
                                         $stmtCheckRec = $pdo->prepare("SELECT rs.max_occurrences, rs.end_date
                                             FROM accounts a
                                             LEFT JOIN recurring_settings rs ON rs.account_id = a.id
-                                            WHERE a.user_id = :uid AND a.description = :desc AND a.is_recurring = 1
+                                            WHERE a.user_id = :uid AND a.description = :desc AND a.type = :type AND a.is_recurring = 1
                                             ORDER BY 
                                               CASE WHEN ((rs.max_occurrences IS NULL OR rs.max_occurrences = 0) AND (rs.end_date IS NULL OR CAST(rs.end_date AS CHAR(10)) = '0000-00-00')) THEN 0 ELSE 1 END ASC,
                                               a.id DESC
                                             LIMIT 1");
-                                        $stmtCheckRec->execute([':uid' => $userId, ':desc' => $account['description']]);
+                                        $stmtCheckRec->execute([':uid' => $userId, ':desc' => $account['description'], ':type' => $account['type']]);
                                         $rowRec = $stmtCheckRec->fetch(PDO::FETCH_ASSOC);
                                         $maxOccX = intval($rowRec['max_occurrences'] ?? 0);
                                         $endX = $rowRec['end_date'] ?? null;
@@ -1478,8 +1478,8 @@ if ($action == 'list') {
                                         if (!$rowRec || (($maxOccX <= 0) && $noEndX)) {
                                             $remainingInstallmentsDisplay = '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">sem data de término</span>';
                                         } else {
-                                            $stmtFindAny = $pdo->prepare("SELECT a.id FROM accounts a WHERE a.user_id = :uid AND a.description = :desc AND a.is_recurring = 1 ORDER BY a.id DESC LIMIT 1");
-                                            $stmtFindAny->execute([':uid' => $userId, ':desc' => $account['description']]);
+                                            $stmtFindAny = $pdo->prepare("SELECT a.id FROM accounts a WHERE a.user_id = :uid AND a.description = :desc AND a.type = :type AND a.is_recurring = 1 ORDER BY a.id DESC LIMIT 1");
+                                            $stmtFindAny->execute([':uid' => $userId, ':desc' => $account['description'], ':type' => $account['type']]);
                                             $rowAny = $stmtFindAny->fetch(PDO::FETCH_ASSOC);
                                             if ($rowAny) {
                                                 $recSetX = $recurringModel->getByAccountId(intval($rowAny['id']));
@@ -1770,12 +1770,12 @@ if ($action == 'list') {
                                             $stmtFindParent = $pdo->prepare("SELECT a.id
                                                 FROM accounts a
                                                 LEFT JOIN recurring_settings rs ON rs.account_id = a.id
-                                                WHERE a.user_id = :uid AND a.description = :desc AND a.is_recurring = 1
+                                                WHERE a.user_id = :uid AND a.description = :desc AND a.type = :type AND a.is_recurring = 1
                                             ORDER BY 
                                               CASE WHEN ((rs.max_occurrences IS NULL OR rs.max_occurrences = 0) AND (rs.end_date IS NULL OR CAST(rs.end_date AS CHAR(10)) = '0000-00-00')) THEN 0 ELSE 1 END ASC,
                                                   a.id DESC
                                                 LIMIT 1");
-                                            $stmtFindParent->execute([':uid' => $userId, ':desc' => $account['description']]);
+                                            $stmtFindParent->execute([':uid' => $userId, ':desc' => $account['description'], ':type' => $account['type']]);
                                             $rowParent = $stmtFindParent->fetch(PDO::FETCH_ASSOC);
                                             $parentId = $rowParent['id'] ?? null;
                                         }
@@ -1935,12 +1935,12 @@ if ($action == 'list') {
                                             $stmtFindParent = $pdo->prepare("SELECT a.id
                                                 FROM accounts a
                                                 LEFT JOIN recurring_settings rs ON rs.account_id = a.id
-                                                WHERE a.user_id = :uid AND a.description = :desc AND a.is_recurring = 1
+                                                WHERE a.user_id = :uid AND a.description = :desc AND a.type = :type AND a.is_recurring = 1
                                                 ORDER BY 
                                               CASE WHEN ((rs.max_occurrences IS NULL OR rs.max_occurrences = 0) AND (rs.end_date IS NULL OR CAST(rs.end_date AS CHAR(10)) = '0000-00-00')) THEN 0 ELSE 1 END ASC,
                                                   a.id DESC
                                                 LIMIT 1");
-                                            $stmtFindParent->execute([':uid' => $userId, ':desc' => $account['description']]);
+                                            $stmtFindParent->execute([':uid' => $userId, ':desc' => $account['description'], ':type' => $account['type']]);
                                             $rowParent = $stmtFindParent->fetch(PDO::FETCH_ASSOC);
                                             $parentId = $rowParent['id'] ?? null;
                                         }
@@ -1953,8 +1953,8 @@ if ($action == 'list') {
                                       $isIndeterminate = ($maxOccurrences <= 0) && $noEnd;
                                       $remainingInstallmentsDisplay = $isIndeterminate ? '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">sem data de término</span>' : (string)$maxOccurrences;
                                         } else {
-                                            $stmtFindAny = $pdo->prepare("SELECT a.id FROM accounts a WHERE a.user_id = :uid AND a.description = :desc AND a.is_recurring = 1 ORDER BY a.id DESC LIMIT 1");
-                                            $stmtFindAny->execute([':uid' => $userId, ':desc' => $account['description']]);
+                                            $stmtFindAny = $pdo->prepare("SELECT a.id FROM accounts a WHERE a.user_id = :uid AND a.description = :desc AND a.type = :type AND a.is_recurring = 1 ORDER BY a.id DESC LIMIT 1");
+                                            $stmtFindAny->execute([':uid' => $userId, ':desc' => $account['description'], ':type' => $account['type']]);
                                             $rowAny = $stmtFindAny->fetch(PDO::FETCH_ASSOC);
                                             if ($rowAny) {
                                                 $recSetX = $recurringModel->getByAccountId(intval($rowAny['id']));
@@ -2082,12 +2082,12 @@ if ($action == 'list') {
                                             $stmtFindParent = $pdo->prepare("SELECT a.id
                                                 FROM accounts a
                                                 LEFT JOIN recurring_settings rs ON rs.account_id = a.id
-                                                WHERE a.user_id = :uid AND a.description = :desc AND a.is_recurring = 1
+                                                WHERE a.user_id = :uid AND a.description = :desc AND a.type = :type AND a.is_recurring = 1
                                                 ORDER BY 
-                                                  CASE WHEN ((rs.max_occurrences IS NULL OR rs.max_occurrences = 0) AND (rs.end_date IS NULL OR CAST(rs.end_date AS CHAR(10)) = '0000-00-00')) THEN 0 ELSE 1 END ASC,
+                                              CASE WHEN ((rs.max_occurrences IS NULL OR rs.max_occurrences = 0) AND (rs.end_date IS NULL OR CAST(rs.end_date AS CHAR(10)) = '0000-00-00')) THEN 0 ELSE 1 END ASC,
                                                   a.id DESC
                                                 LIMIT 1");
-                                            $stmtFindParent->execute([':uid' => $userId, ':desc' => $account['description']]);
+                                            $stmtFindParent->execute([':uid' => $userId, ':desc' => $account['description'], ':type' => $account['type']]);
                                             $rowParent = $stmtFindParent->fetch(PDO::FETCH_ASSOC);
                                             $parentId = $rowParent['id'] ?? null;
                                         }
@@ -2100,8 +2100,8 @@ if ($action == 'list') {
                                             $isIndeterminate = ($maxOccurrences <= 0) && $noEnd;
                                             $remainingInstallmentsDisplay = $isIndeterminate ? '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">sem data de término</span>' : (string)$maxOccurrences;
                                         } else {
-                                            $stmtFindAny = $pdo->prepare("SELECT a.id FROM accounts a WHERE a.user_id = :uid AND a.description = :desc AND a.is_recurring = 1 ORDER BY a.id DESC LIMIT 1");
-                                            $stmtFindAny->execute([':uid' => $userId, ':desc' => $account['description']]);
+                                            $stmtFindAny = $pdo->prepare("SELECT a.id FROM accounts a WHERE a.user_id = :uid AND a.description = :desc AND a.type = :type AND a.is_recurring = 1 ORDER BY a.id DESC LIMIT 1");
+                                            $stmtFindAny->execute([':uid' => $userId, ':desc' => $account['description'], ':type' => $account['type']]);
                                             $rowAny = $stmtFindAny->fetch(PDO::FETCH_ASSOC);
                                             if ($rowAny) {
                                                 $recSetX = $recurringModel->getByAccountId(intval($rowAny['id']));

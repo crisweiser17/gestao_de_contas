@@ -33,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         // Validação
         if (empty($data['name'])) {
             $errors[] = 'Nome é obrigatório';
-        } else if ($categoryModel->nameExists($data['name'], $userId, $action == 'edit' ? $categoryId : null)) {
+        } else if ($categoryModel->nameExists($data['name'], $userId, $data['type'], $action == 'edit' ? $categoryId : null)) {
             $errors[] = 'Já existe uma categoria com este nome';
         }
         
@@ -42,20 +42,24 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
 
         if (empty($errors)) {
-            if ($action == 'add') {
-                if ($categoryModel->create($data)) {
-                    $success = 'Categoria criada com sucesso!';
-                    $action = 'list';
-                } else {
-                    $errors[] = 'Erro ao criar categoria';
+            try {
+                if ($action == 'add') {
+                    if ($categoryModel->create($data)) {
+                        $success = 'Categoria criada com sucesso!';
+                        $action = 'list';
+                    } else {
+                        $errors[] = 'Erro ao criar categoria';
+                    }
+                } else if ($action == 'edit' && $categoryId) {
+                    if ($categoryModel->update($categoryId, $data, $userId)) {
+                        $success = 'Categoria atualizada com sucesso!';
+                        $action = 'list';
+                    } else {
+                        $errors[] = 'Erro ao atualizar categoria';
+                    }
                 }
-            } else if ($action == 'edit' && $categoryId) {
-                if ($categoryModel->update($categoryId, $data, $userId)) {
-                    $success = 'Categoria atualizada com sucesso!';
-                    $action = 'list';
-                } else {
-                    $errors[] = 'Erro ao atualizar categoria';
-                }
+            } catch (Exception $e) {
+                $errors[] = $e->getMessage();
             }
         }
     } else if ($action == 'delete' && $categoryId) {

@@ -68,9 +68,14 @@ class Category {
             }
             
         } catch (PDOException $e) {
-            // Capturar especificamente erros de foreign key constraint
             if ($e->getCode() == '23000') {
-                throw new Exception('Erro: O usuário especificado não existe. Verifique o user_id.');
+                $msg = $e->getMessage();
+                if (stripos($msg, 'unique_user_category') !== false || stripos($msg, 'Duplicate entry') !== false) {
+                    throw new Exception('Já existe uma categoria com este nome para este usuário');
+                }
+                if (stripos($msg, 'foreign key') !== false) {
+                    throw new Exception('Erro: O usuário especificado não existe. Verifique o user_id.');
+                }
             }
             throw new Exception('Erro de banco de dados: ' . $e->getMessage());
         }
@@ -103,9 +108,18 @@ class Category {
     /**
      * Verificar se já existe categoria com o mesmo nome para o usuário
      */
-    public function nameExists($name, $userId, $excludeId = null) {
-        $query = 'SELECT COUNT(*) FROM categories WHERE user_id = ? AND LOWER(name) = LOWER(?)';
-        $params = [$userId, trim($name)];
+    public function nameExists($name, $userId, $type = null, $excludeId = null) {
+        $isTypeValid = is_string($type) && in_array($type, ['receita', 'despesa']);
+        $query = 'SELECT COUNT(*) FROM categories WHERE user_id = ?';
+        $params = [$userId];
+        if ($isTypeValid) {
+            $query .= ' AND type = ?';
+            $params[] = $type;
+        } else if ($type !== null && (is_int($type) || ctype_digit((string)$type))) {
+            $excludeId = $type;
+        }
+        $query .= ' AND LOWER(name) = LOWER(?)';
+        $params[] = trim($name);
         if ($excludeId) {
             $query .= ' AND id <> ?';
             $params[] = $excludeId;
@@ -197,8 +211,18 @@ class Category {
             $where .= ' AND user_id = ?';
             $values[] = $userId;
         }
-        $stmt = $this->pdo->prepare('UPDATE categories SET ' . implode(', ', $fields) . ' WHERE ' . $where);
-        return $stmt->execute($values);
+        try {
+            $stmt = $this->pdo->prepare('UPDATE categories SET ' . implode(', ', $fields) . ' WHERE ' . $where);
+            return $stmt->execute($values);
+        } catch (PDOException $e) {
+            if ($e->getCode() == '23000') {
+                $msg = $e->getMessage();
+                if (stripos($msg, 'unique_user_category') !== false || stripos($msg, 'Duplicate entry') !== false) {
+                    throw new Exception('Já existe uma categoria com este nome para este usuário');
+                }
+            }
+            throw new Exception('Erro de banco de dados: ' . $e->getMessage());
+        }
     }
     
     /**
