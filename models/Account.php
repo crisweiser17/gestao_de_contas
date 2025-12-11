@@ -216,8 +216,22 @@ class Account {
 
     // Atualizar apenas status
     public function updateStatus($id, $status, $userId) {
+        // Buscar tipo da conta para validar status compatível
+        $account = $this->getById($id, $userId);
+        if (!$account) {
+            return false;
+        }
+        $type = $account['type'] ?? null;
+        if ($type === 'despesa' && !in_array($status, ['pendente', 'paga'])) {
+            $status = 'paga';
+        } else if ($type === 'receita' && !in_array($status, ['pendente', 'recebida'])) {
+            $status = 'recebida';
+        } else if (!in_array($status, ['pendente', 'paga', 'recebida'])) {
+            $status = 'pendente';
+        }
+
         $query = "UPDATE " . $this->table_name . " 
-                  SET status = :status 
+                  SET status = :status, updated_at = CURRENT_TIMESTAMP 
                   WHERE id = :id AND user_id = :user_id";
         
         $stmt = $this->conn->prepare($query);
@@ -225,7 +239,8 @@ class Account {
         $stmt->bindParam(':status', $status);
         $stmt->bindParam(':user_id', $userId);
         
-        return $stmt->execute();
+        $stmt->execute();
+        return $stmt->rowCount() > 0;
     }
 
     // Deletar conta

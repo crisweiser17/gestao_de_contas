@@ -374,7 +374,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         } elseif (!in_array($status, ['pendente', 'paga', 'recebida'])) {
             $errors[] = "ERRO: Status inválido: '{$status}'. Valores aceitos: pendente, paga, recebida";
         } else {
-            // Get current status before update
             $currentAccount = $accountModel->getById($accountId, $userId);
             if (!$currentAccount) {
                 $errors[] = "ERRO: Conta não encontrada (ID: {$accountId}, User: {$userId})";
@@ -386,7 +385,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $debugInfo .= "Update Result: " . ($updateResult ? 'SUCCESS' : 'FAILED') . " | ";
                 
                 if ($updateResult) {
-                    // Verify the update immediately
                     $verifyAccount = $accountModel->getById($accountId, $userId);
                     $actualStatus = $verifyAccount ? $verifyAccount['status'] : 'unknown';
                     $debugInfo .= "Verified Status: {$actualStatus} | ";
@@ -397,7 +395,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $errors[] = "❌ PROBLEMA: Status não foi salvo! Esperado: {$status}, Atual: {$actualStatus}";
                     }
                 } else {
-                    $errors[] = '❌ Erro ao executar UPDATE no banco de dados';
+                    $errors[] = '❌ Nenhuma linha foi atualizada. Verifique o usuário da sessão e os filtros.';
                 }
             }
         }
